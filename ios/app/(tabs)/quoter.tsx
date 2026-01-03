@@ -56,11 +56,10 @@ export default function QuoterScreen() {
     }
   };
 
-  // --- NEW SHARE LOGIC ---
   const handleShare = async () => {
     const shareDetails = {
       title: `NDIS Quote - ${selectedClient?.name}`,
-      text: `Hi ${selectedClient?.name}, here is your NDIS Home Mod quote from ${bizInfo?.bizName}.\n\nTotal: $${totalPrice}\nNDIS No: ${selectedClient?.ndisNum}\n\nGenerated via ModiProof.`,
+      text: `Hi ${selectedClient?.name}, here is your NDIS Home Mod quote from ${bizInfo?.bizName}.\n\nTotal: $${totalPrice}\nNDIS No: ${selectedClient?.ndisNum}\n\nGenerated via ModiProof™.`,
     };
 
     if (Platform.OS === 'web' && navigator.share) {
@@ -70,7 +69,6 @@ export default function QuoterScreen() {
         console.log("Error sharing:", error);
       }
     } else {
-      // Fallback for desktop browsers or simulated mobile
       Alert.alert("Quote Summary Copied", shareDetails.text);
     }
   };
@@ -102,7 +100,7 @@ export default function QuoterScreen() {
       <View style={styles.pickerSection}>
         <ThemedText style={styles.label}>Select Participant:</ThemedText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          {clients.length === 0 && <ThemedText style={{fontSize: 12, color: '#999'}}>No clients found. Add them in the Clients tab.</ThemedText>}
+          {clients.length === 0 && <ThemedText style={{fontSize: 12, color: '#999'}}>No clients found.</ThemedText>}
           {clients.map(c => (
             <TouchableOpacity 
               key={c.id} 
@@ -156,57 +154,75 @@ export default function QuoterScreen() {
             <TouchableOpacity onPress={() => setShowPreview(false)}>
                <ThemedText style={{color: '#007AFF'}}>Back</ThemedText>
             </TouchableOpacity>
-            
             <ThemedText type="defaultSemiBold">Compliance Preview</ThemedText>
-            
             <View style={{flexDirection: 'row', gap: 20}}>
-              {/* --- ADDED SHARE ICON --- */}
               <TouchableOpacity onPress={handleShare}>
                  <Ionicons name="share-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
-              
               <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.print() : Alert.alert("Print", "Connect to AirPrint device")}>
                  <Ionicons name="print" size={24} color="#007AFF" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <ScrollView contentContainerStyle={styles.previewPaper}>
-            <View style={styles.paperHeader}>
-               <ThemedText type="title" style={{fontSize: 22}}>{bizInfo?.bizName}</ThemedText>
-               <ThemedText>ABN: {bizInfo?.abn}</ThemedText>
-               <ThemedText>Provider ID: {bizInfo?.providerNum}</ThemedText>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.paperSection}>
-               <ThemedText style={styles.label}>To Participant:</ThemedText>
-               <ThemedText type="defaultSemiBold" style={{fontSize: 18}}>{selectedClient?.name}</ThemedText>
-               <ThemedText>NDIS No: {selectedClient?.ndisNum}</ThemedText>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.paperSection}>
-               <ThemedText style={[styles.label, {marginBottom: 10}]}>Scope of Works</ThemedText>
-               {estimate.map((item, index) => (
-                 <View key={index} style={styles.previewItemRow}>
-                   <View style={{flex: 1}}>
-                     <ThemedText>{item.title}</ThemedText>
-                     <ThemedText style={{fontSize: 10, color: '#666'}}>{item.code}</ThemedText>
+          <View style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={styles.previewPaper}>
+              {/* --- WATERMARK LAYER --- */}
+              <View style={styles.watermarkOverlay} pointerEvents="none">
+                <ThemedText style={styles.watermarkText}>AUDIT READY</ThemedText>
+                <ThemedText style={styles.watermarkSub}>MODIPROOF™ SECURE</ThemedText>
+              </View>
+
+              <View style={styles.paperHeader}>
+                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                  <View>
+                    <ThemedText type="title" style={{fontSize: 22}}>{bizInfo?.bizName}</ThemedText>
+                    <ThemedText style={{fontSize: 10, color: '#666'}}>ABN: {bizInfo?.abn}</ThemedText>
+                  </View>
+                  <View style={{alignItems: 'flex-end'}}>
+                    <ThemedText style={styles.brandTrademark}>ModiProof™</ThemedText>
+                    <ThemedText style={{fontSize: 8, color: '#aaa'}}>OFFICIAL RECORD</ThemedText>
+                  </View>
+                </View>
+                <ThemedText style={{marginTop: 4}}>Provider ID: {bizInfo?.providerNum}</ThemedText>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.paperSection}>
+                 <ThemedText style={styles.label}>To Participant:</ThemedText>
+                 <ThemedText type="defaultSemiBold" style={{fontSize: 18}}>{selectedClient?.name}</ThemedText>
+                 <ThemedText>NDIS No: {selectedClient?.ndisNum}</ThemedText>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.paperSection}>
+                 <ThemedText style={[styles.label, {marginBottom: 10}]}>Scope of Works</ThemedText>
+                 {estimate.map((item, index) => (
+                   <View key={index} style={styles.previewItemRow}>
+                     <View style={{flex: 1}}>
+                       <ThemedText>{item.title}</ThemedText>
+                       <ThemedText style={{fontSize: 10, color: '#666'}}>{item.code}</ThemedText>
+                     </View>
+                     <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
                    </View>
-                   <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
-                 </View>
-               ))}
-            </View>
-            <View style={styles.paperTotal}>
-               <ThemedText type="subtitle">Grand Total</ThemedText>
-               <ThemedText type="subtitle" style={{color: '#007AFF'}}>${totalPrice}</ThemedText>
-            </View>
-            <View style={styles.complianceNote}>
-               <Ionicons name="checkmark-seal" size={16} color="#34a853" />
-               <ThemedText style={styles.footerNote}>
-                 This document is an official NDIS Audit Trail record.
-               </ThemedText>
-            </View>
-          </ScrollView>
+                 ))}
+              </View>
+
+              <View style={styles.paperTotal}>
+                 <ThemedText type="subtitle">Grand Total</ThemedText>
+                 <ThemedText type="subtitle" style={{color: '#007AFF'}}>${totalPrice}</ThemedText>
+              </View>
+
+              <View style={styles.complianceNote}>
+                 <Ionicons name="checkmark-seal" size={16} color="#34a853" />
+                 <ThemedText style={styles.footerNote}>
+                   This document is an official NDIS Audit Trail record.
+                 </ThemedText>
+              </View>
+            </ScrollView>
+          </View>
         </ThemedView>
       </Modal>
     </ThemedView>
@@ -232,12 +248,28 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: 'bold' },
   previewContainer: { flex: 1, backgroundColor: '#f0f0f0' },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#fff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ddd' },
-  previewPaper: { padding: 30, backgroundColor: '#fff', margin: 15, borderRadius: 8, shadowOpacity: 0.1, minHeight: '80%' },
+  previewPaper: { padding: 30, backgroundColor: '#fff', margin: 15, borderRadius: 8, shadowOpacity: 0.1, minHeight: '80%', position: 'relative', overflow: 'hidden' },
   paperHeader: { marginBottom: 10 },
   divider: { height: 1, backgroundColor: '#eee', marginVertical: 15 },
   paperSection: { marginBottom: 10 },
   previewItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0' },
   paperTotal: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 25, paddingTop: 15, borderTopWidth: 2, borderTopColor: '#eee' },
   complianceNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 },
-  footerNote: { fontSize: 10, color: '#34a853', fontWeight: '600' }
+  footerNote: { fontSize: 10, color: '#34a853', fontWeight: '600' },
+  
+  // --- NEW BRANDING STYLES ---
+  brandTrademark: { fontSize: 14, fontWeight: '900', color: '#007AFF' },
+  watermarkOverlay: {
+    position: 'absolute',
+    top: '35%',
+    left: '-10%',
+    right: '-10%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.05,
+    transform: [{ rotate: '-30deg' }],
+    zIndex: 0,
+  },
+  watermarkText: { fontSize: 60, fontWeight: '900', color: '#000' },
+  watermarkSub: { fontSize: 14, fontWeight: 'bold', letterSpacing: 4, color: '#000' },
 });
