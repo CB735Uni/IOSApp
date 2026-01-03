@@ -1,132 +1,160 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, View, Platform } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, View, Platform, Image, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 
-export default function NDISDashboard() {
-  const [projectTitle] = useState("Smith Residence - Bathroom Mod");
+export default function ModiProofDashboard() {
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  // Web-friendly mock data
-  const [tasks, setTasks] = useState([
-    { id: 1, label: "Upload OT Assessment (PDF)", done: true, code: "06_182499311" },
-    { id: 2, label: "Initial Site Measurements", done: false, code: "06_182400321" },
-    { id: 3, label: "Before Photos (Mandatory for Audit)", done: false, code: "Photo-Only" },
-  ]);
+  const captureEvidence = async () => {
+    setIsCapturing(true);
+    try {
+      // 1. Request Permissions
+      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+      const locationStatus = await Location.requestForegroundPermissionsAsync();
+
+      if (cameraStatus.status !== 'granted' || locationStatus.status !== 'granted') {
+        Alert.alert("Permission Required", "ModiProof needs Camera and GPS access to verify audit evidence.");
+        return;
+      }
+
+      // 2. Launch Camera
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        // 3. Get Real GPS Coordinates
+        const location = await Location.getCurrentPositionAsync({});
+        
+        const newPhoto = {
+          id: Date.now().toString(),
+          uri: result.assets[0].uri,
+          timestamp: new Date().toLocaleString('en-AU'),
+          coords: `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`,
+          verified: true
+        };
+
+        setPhotos([newPhoto, ...photos]);
+      }
+    } catch (e) {
+      Alert.alert("Error", "Could not capture compliance photo.");
+    } finally {
+      setIsCapturing(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* 1. Header with 'Web vs Mobile' check */}
       <ThemedView style={styles.header}>
-        <ThemedText type="title">ModiProof Dashboard</ThemedText>
-        <ThemedText type="subtitle">
-          {projectTitle} {Platform.OS === 'web' ? '(Web Preview)' : ''}
-        </ThemedText>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+          <Ionicons name="shield-checkmark" size={24} color="#007AFF" />
+          <ThemedText type="title" style={styles.brandTitle}>ModiProof™</ThemedText>
+        </View>
+        <ThemedText style={styles.projectLabel}>Evidence Dashboard</ThemedText>
       </ThemedView>
 
-      {/* 2. The 'Audit-Ready' Alert */}
-      <View style={styles.alertBox}>
-        <Ionicons name="shield-checkmark" size={24} color="#155724" />
-        <ThemedText style={styles.alertText}>
-          System Status: Compliance records are 60% complete.
-        </ThemedText>
+      {/* Audit Readiness Progress */}
+      <View style={styles.auditCard}>
+        <View style={styles.auditHeader}>
+          <ThemedText style={styles.auditTitle}>AUDIT READINESS</ThemedText>
+          <ThemedText style={styles.auditPercent}>{photos.length > 0 ? '100%' : '20%'}</ThemedText>
+        </View>
+        <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarFill, { width: photos.length > 0 ? '100%' : '20%' }]} />
+        </View>
       </View>
 
-      {/* 3. Action Grid (Interactive Buttons) */}
-      <View style={styles.grid}>
-        <ActionButton 
-          icon="camera" 
-          title="Field Photos" 
-          onPress={() => alert('Camera requested. (On web, this will open file upload)')} 
-        />
-        <ActionButton 
-          icon="document-text" 
-          title="NDIS Quote" 
-          onPress={() => alert('Opening Item Code Calculator...')} 
-        />
-        <ActionButton 
-          icon="shield" 
-          title="Audit Trail" 
-          onPress={() => alert('Viewing historical logs...')} 
-        />
-        <ActionButton 
-          icon="send" 
-          title="Submit Claim" 
-          onPress={() => alert('Reviewing documentation for errors...')} 
-        />
-      </View>
-
-      {/* 4. Active Workflow (Vertical List) */}
-      <ThemedView style={styles.section}>
-        <ThemedText type="defaultSemiBold" style={{ marginBottom: 10 }}>Active Checklist</ThemedText>
-        {tasks.map((task) => (
-          <View key={task.id} style={styles.taskRow}>
-            <Ionicons 
-              name={task.done ? "checkbox" : "square-outline"} 
-              size={24} 
-              color={task.done ? "#28a745" : "#ccc"} 
-            />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <ThemedText>{task.label}</ThemedText>
-              <ThemedText style={styles.codeText}>Code: {task.code}</ThemedText>
-            </View>
+      {/* The Evidence Feed */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="defaultSemiBold">Field Evidence Trail</ThemedText>
+          <TouchableOpacity 
+            onPress={captureEvidence} 
+            disabled={isCapturing}
+            style={[styles.addBtn, isCapturing && { opacity: 0.5 }]}
+          >
+             <Ionicons name="camera" size={18} color="#fff" />
+             <ThemedText style={styles.addBtnText}>{isCapturing ? 'Verifying...' : 'Capture'}</ThemedText>
+          </TouchableOpacity>
+        </View>
+        
+        {photos.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="images-outline" size={48} color="#ccc" />
+            <ThemedText style={{color: '#aaa', marginTop: 10}}>No verified photos yet.</ThemedText>
           </View>
-        ))}
-      </ThemedView>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoList}>
+            {photos.map(photo => (
+              <View key={photo.id} style={styles.photoCard}>
+                <Image source={{ uri: photo.uri }} style={styles.photoImg} />
+                <View style={styles.metadataBox}>
+                  <ThemedText style={styles.metaText}><Ionicons name="time" size={10} /> {photo.timestamp}</ThemedText>
+                  <ThemedText style={styles.metaText}><Ionicons name="location" size={10} /> {photo.coords}</ThemedText>
+                </View>
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                  <ThemedText style={styles.verifiedText}>VERIFIED</ThemedText>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Action Grid */}
+      <View style={styles.grid}>
+        <ActionButton icon="document-text" title="Generate Quote" color="#007AFF" />
+        <ActionButton icon="list" title="Audit Logs" color="#fbbc05" />
+      </View>
     </ScrollView>
   );
 }
 
-// Reusable Button Component
-function ActionButton({ icon, title, onPress }: any) {
+// Reusable ActionButton
+function ActionButton({ icon, title, color }: any) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <Ionicons name={icon} size={32} color="#007AFF" />
+    <TouchableOpacity style={styles.card}>
+      <View style={[styles.iconCircle, { backgroundColor: color + '15' }]}>
+        <Ionicons name={icon} size={24} color={color} />
+      </View>
       <ThemedText style={styles.cardTitle}>{title}</ThemedText>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   content: { padding: 20, maxWidth: 600, alignSelf: 'center', width: '100%' },
-  header: { marginTop: 20, marginBottom: 20, backgroundColor: 'transparent' },
-  alertBox: { 
-    flexDirection: 'row', 
-    backgroundColor: '#d4edda', 
-    padding: 15, 
-    borderRadius: 10, 
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#c3e6cb'
-  },
-  alertText: { color: '#155724', marginLeft: 10, fontWeight: '500' },
-  grid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'space-between', 
-    marginBottom: 20 
-  },
-  card: {
-    backgroundColor: '#fff',
-    width: '48%',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  cardTitle: { marginTop: 8, fontWeight: '600', fontSize: 13 },
-  section: { 
-    padding: 20, 
-    borderRadius: 15, 
-    backgroundColor: '#fff',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-  },
-  taskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  codeText: { fontSize: 12, color: '#888', marginTop: 2 }
+  header: { marginTop: 10, marginBottom: 20, backgroundColor: 'transparent' },
+  brandTitle: { fontWeight: '800', letterSpacing: -0.5 },
+  projectLabel: { color: '#666', fontSize: 14, marginTop: 4 },
+  auditCard: { backgroundColor: '#1a1a1a', padding: 20, borderRadius: 16, marginBottom: 25 },
+  auditHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  auditTitle: { color: '#fff', fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+  auditPercent: { color: '#34a853', fontWeight: 'bold' },
+  progressBarBg: { height: 6, backgroundColor: '#333', borderRadius: 3 },
+  progressBarFill: { height: 6, backgroundColor: '#34a853', borderRadius: 3 },
+  section: { marginBottom: 25 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#007AFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  addBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40, backgroundColor: '#fff', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ccc' },
+  photoList: { flexDirection: 'row' },
+  photoCard: { marginRight: 15, width: 180, backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
+  photoImg: { width: '100%', height: 110 },
+  metadataBox: { padding: 8 },
+  metaText: { fontSize: 9, color: '#888', marginBottom: 2 },
+  verifiedBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#34a853', flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
+  verifiedText: { color: '#fff', fontSize: 8, fontWeight: 'bold' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  card: { backgroundColor: '#fff', width: '48%', padding: 20, borderRadius: 16, marginBottom: 15, alignItems: 'center', borderWidth: 1, borderColor: '#f0f0f0' },
+  iconCircle: { padding: 12, borderRadius: 25, marginBottom: 8 },
+  cardTitle: { fontWeight: '600', fontSize: 13 }
 });
