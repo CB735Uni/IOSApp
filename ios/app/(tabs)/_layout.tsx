@@ -15,6 +15,14 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          marginBottom: 4,
+        },
+        tabBarStyle: {
+          paddingBottom: 8,
+          height: 65,
+        },
       }}>
       <Tabs.Screen
         name="index"
@@ -24,10 +32,43 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="clients"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Clients',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="vault"
+        options={{
+          title: 'Vault',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="lock.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+        }}
+      />
+      {/* Hidden tabs - accessible via navigation but not in tab bar */}
+      <Tabs.Screen
+        name="claims"
+        options={{
+          href: null, // Hides from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="audit"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="quoter"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

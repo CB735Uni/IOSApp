@@ -92,9 +92,18 @@ export default function QuoterScreen() {
             <ThemedText style={{color: '#ff4444', fontSize: 12}}>Reset</ThemedText>
           </TouchableOpacity>
         </View>
-        <ThemedText style={styles.bizSub}>
-          {bizInfo ? `Issuing as: ${bizInfo.bizName}` : "⚠️ Profile incomplete in Settings"}
-        </ThemedText>
+        {bizInfo ? (
+          <ThemedText style={styles.bizSub}>
+            Issuing as: {bizInfo.bizName}
+          </ThemedText>
+        ) : (
+          <View style={styles.infoBox}>
+            <Ionicons name="information-circle" size={20} color="#b8860b" />
+            <ThemedText style={styles.infoText}>
+              Business profile required - Complete your organization details in Settings to generate quotes
+            </ThemedText>
+          </View>
+        )}
       </View>
 
       <View style={styles.pickerSection}>
@@ -233,6 +242,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   header: { marginBottom: 15, marginTop: 10 },
   bizSub: { fontSize: 12, color: '#007AFF', fontWeight: 'bold', marginTop: 5 },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fffbea', padding: 12, borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#ffd966' },
+  infoText: { fontSize: 12, color: '#b8860b', flex: 1, lineHeight: 18 },
   label: { fontSize: 11, color: '#666', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
   pickerSection: { marginBottom: 20 },
   chipScroll: { flexDirection: 'row' },

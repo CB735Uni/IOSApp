@@ -15,7 +15,8 @@ export default function AuthScreen() {
     const handleAuth = async () => {
     // Simulate API login
     await AsyncStorage.setItem('userToken', 'fake-secure-id-123');
-    // router.replace will be handled by the Layout's useEffect!
+    // Navigate to dashboard after successful login
+    router.replace('/(tabs)');
     };
   return (
     <ThemedView style={styles.container}>

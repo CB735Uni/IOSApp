@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, ScrollView, View, Platform, Image, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +12,20 @@ import * as Location from 'expo-location';
 export default function ModiProofDashboard() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [bizInfo, setBizInfo] = useState<any>(null);
+  const router = useRouter();
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (isFocused) {
+      loadBusinessInfo();
+    }
+  }, [isFocused]);
+
+  const loadBusinessInfo = async () => {
+    const savedBiz = await AsyncStorage.getItem('@provider_settings');
+    if (savedBiz) setBizInfo(JSON.parse(savedBiz));
+  };
 
   const captureEvidence = async () => {
     setIsCapturing(true);
@@ -58,6 +75,19 @@ export default function ModiProofDashboard() {
         </View>
         <ThemedText style={styles.projectLabel}>Evidence Dashboard</ThemedText>
       </ThemedView>
+
+      {/* Business Profile Warning */}
+      {!bizInfo && (
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={20} color="#b8860b" />
+          <ThemedText style={styles.infoText}>
+            Complete your business profile in Settings to unlock all features
+          </ThemedText>
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <Ionicons name="arrow-forward-circle" size={24} color="#b8860b" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Audit Readiness Progress */}
       <View style={styles.auditCard}>
@@ -110,17 +140,17 @@ export default function ModiProofDashboard() {
 
       {/* Action Grid */}
       <View style={styles.grid}>
-        <ActionButton icon="document-text" title="Generate Quote" color="#007AFF" />
-        <ActionButton icon="list" title="Audit Logs" color="#fbbc05" />
+        <ActionButton icon="document-text" title="Generate Quote" color="#007AFF" onPress={() => router.push('/quoter')} />
+        <ActionButton icon="list" title="Audit Logs" color="#fbbc05" onPress={() => router.push('/audit')} />
       </View>
     </ScrollView>
   );
 }
 
 // Reusable ActionButton
-function ActionButton({ icon, title, color }: any) {
+function ActionButton({ icon, title, color, onPress }: any) {
   return (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={[styles.iconCircle, { backgroundColor: color + '15' }]}>
         <Ionicons name={icon} size={24} color={color} />
       </View>
@@ -133,6 +163,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   content: { padding: 20, maxWidth: 600, alignSelf: 'center', width: '100%' },
   header: { marginTop: 10, marginBottom: 20, backgroundColor: 'transparent' },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fffbea', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#ffd966' },
+  infoText: { fontSize: 12, color: '#b8860b', flex: 1, lineHeight: 18 },
   brandTitle: { fontWeight: '800', letterSpacing: -0.5 },
   projectLabel: { color: '#666', fontSize: 14, marginTop: 4 },
   auditCard: { backgroundColor: '#1a1a1a', padding: 20, borderRadius: 16, marginBottom: 25 },
