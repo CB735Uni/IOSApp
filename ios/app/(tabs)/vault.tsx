@@ -3,12 +3,20 @@ import { StyleSheet, TouchableOpacity, ScrollView, View, Image } from 'react-nat
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export default function AuditVaultScreen() {
   const [files, setFiles] = useState([
     { id: '1', title: 'OT Assessment.pdf', type: 'doc', date: '01/01/26' },
     { id: '2', title: 'Existing Bathroom (Before).jpg', type: 'img', date: '02/01/26', uri: 'https://via.placeholder.com/150' },
   ]);
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
+  const surface = colorScheme === 'dark' ? '#1b2026' : '#fff';
+  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
+  const border = colorScheme === 'dark' ? '#2d3238' : '#eaeaea';
+  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
 
   const addFile = () => {
     // In a real app, this would use Expo ImagePicker or DocumentPicker
@@ -18,10 +26,10 @@ export default function AuditVaultScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
       <View style={styles.header}>
-        <ThemedText type="title">Audit Vault</ThemedText>
-        <ThemedText style={styles.sub}>Job: Smith Residence #4492</ThemedText>
+        <ThemedText type="title" style={{ color: palette.text }}>Audit Vault</ThemedText>
+        <ThemedText style={[styles.sub, { color: muted }]}>Job: Smith Residence #4492</ThemedText>
       </View>
 
       {/* Upload Button */}
@@ -31,30 +39,30 @@ export default function AuditVaultScreen() {
       </TouchableOpacity>
 
       <ScrollView style={styles.fileList}>
-        <ThemedText style={styles.label}>Mandatory Evidence for PACE Claims:</ThemedText>
+        <ThemedText style={[styles.label, { color: muted }]}>Mandatory Evidence for PACE Claims:</ThemedText>
         
         {files.map((file) => (
-          <View key={file.id} style={styles.fileCard}>
+          <View key={file.id} style={[styles.fileCard, { backgroundColor: surface, borderColor: border }]}> 
             <Ionicons 
               name={file.type === 'doc' ? "document-text" : "image"} 
               size={32} 
               color="#007AFF" 
             />
             <View style={styles.fileInfo}>
-              <ThemedText type="defaultSemiBold">{file.title}</ThemedText>
-              <ThemedText style={styles.dateText}>Uploaded: {file.date}</ThemedText>
+              <ThemedText type="defaultSemiBold" style={{ color: palette.text }}>{file.title}</ThemedText>
+              <ThemedText style={[styles.dateText, { color: muted }]}>Uploaded: {file.date}</ThemedText>
             </View>
             <TouchableOpacity>
-               <Ionicons name="eye-outline" size={24} color="#666" />
+               <Ionicons name="eye-outline" size={24} color={colorScheme === 'dark' ? '#c8ccd2' : '#666'} />
             </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
 
       {/* PACE Compliance Guard */}
-      <View style={styles.guardBox}>
-        <Ionicons name="shield-checkmark" size={20} color="#155724" />
-        <ThemedText style={styles.guardText}>
+      <View style={[styles.guardBox, { backgroundColor: colorScheme === 'dark' ? '#102d1a' : '#d4edda', borderColor: colorScheme === 'dark' ? '#1f4a2f' : 'transparent' }]}>
+        <Ionicons name="shield-checkmark" size={20} color={colorScheme === 'dark' ? '#8ae2a2' : '#155724'} />
+        <ThemedText style={[styles.guardText, { color: colorScheme === 'dark' ? '#d8f5e3' : '#155724' }]}>
           Audit Readiness: **High**. All required "Before" photos are GPS-tagged.
         </ThemedText>
       </View>
@@ -85,7 +93,8 @@ const styles = StyleSheet.create({
     marginBottom: 10, 
     alignItems: 'center',
     shadowOpacity: 0.05,
-    elevation: 2
+    elevation: 2,
+    borderWidth: 1
   },
   fileInfo: { flex: 1, marginLeft: 15 },
   dateText: { fontSize: 12, color: '#999' },
@@ -95,7 +104,8 @@ const styles = StyleSheet.create({
     borderRadius: 10, 
     flexDirection: 'row', 
     alignItems: 'center',
-    marginTop: 10
+    marginTop: 10,
+    borderWidth: 1
   },
   guardText: { color: '#155724', fontSize: 12, marginLeft: 10, flex: 1 }
 });

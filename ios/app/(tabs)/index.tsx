@@ -8,6 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export default function ModiProofDashboard() {
   const [photos, setPhotos] = useState<any[]>([]);
@@ -15,6 +17,12 @@ export default function ModiProofDashboard() {
   const [bizInfo, setBizInfo] = useState<any>(null);
   const router = useRouter();
   const isFocused = useIsFocused();
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
+  const surface = colorScheme === 'dark' ? '#1f2429' : '#fff';
+  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
+  const border = colorScheme === 'dark' ? '#2d3238' : '#eee';
+  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
 
   useEffect(() => {
     if (isFocused) {
@@ -67,13 +75,16 @@ export default function ModiProofDashboard() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: surfaceAlt }]} 
+      contentContainerStyle={styles.content}
+    >
       <ThemedView style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Ionicons name="shield-checkmark" size={24} color="#007AFF" />
           <ThemedText type="title" style={styles.brandTitle}>ModiProof™</ThemedText>
         </View>
-        <ThemedText style={styles.projectLabel}>Evidence Dashboard</ThemedText>
+        <ThemedText style={[styles.projectLabel, { color: muted }]}>Evidence Dashboard</ThemedText>
       </ThemedView>
 
       {/* Business Profile Warning */}
@@ -90,20 +101,20 @@ export default function ModiProofDashboard() {
       )}
 
       {/* Audit Readiness Progress */}
-      <View style={styles.auditCard}>
+      <View style={[styles.auditCard, { backgroundColor: surface, borderColor: border }]}> 
         <View style={styles.auditHeader}>
-          <ThemedText style={styles.auditTitle}>AUDIT READINESS</ThemedText>
+          <ThemedText style={[styles.auditTitle, { color: muted }]}>AUDIT READINESS</ThemedText>
           <ThemedText style={styles.auditPercent}>{photos.length > 0 ? '100%' : '20%'}</ThemedText>
         </View>
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: photos.length > 0 ? '100%' : '20%' }]} />
+        <View style={[styles.progressBarBg, { backgroundColor: colorScheme === 'dark' ? '#242b31' : '#333' }]}>
+          <View style={[styles.progressBarFill, { width: photos.length > 0 ? '100%' : '20%', backgroundColor: '#34a853' }]} />
         </View>
       </View>
 
       {/* The Evidence Feed */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <ThemedText type="defaultSemiBold">Field Evidence Trail</ThemedText>
+          <ThemedText type="defaultSemiBold" style={{ color: palette.text }}>Field Evidence Trail</ThemedText>
           <TouchableOpacity 
             onPress={captureEvidence} 
             disabled={isCapturing}
@@ -115,14 +126,14 @@ export default function ModiProofDashboard() {
         </View>
         
         {photos.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={[styles.emptyState, { backgroundColor: surface, borderColor: border }]}>
             <Ionicons name="images-outline" size={48} color="#ccc" />
             <ThemedText style={{color: '#aaa', marginTop: 10}}>No verified photos yet.</ThemedText>
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoList}>
             {photos.map(photo => (
-              <View key={photo.id} style={styles.photoCard}>
+              <View key={photo.id} style={[styles.photoCard, { backgroundColor: surface, borderColor: border }]}>
                 <Image source={{ uri: photo.uri }} style={styles.photoImg} />
                 <View style={styles.metadataBox}>
                   <ThemedText style={styles.metaText}><Ionicons name="time" size={10} /> {photo.timestamp}</ThemedText>
@@ -140,21 +151,23 @@ export default function ModiProofDashboard() {
 
       {/* Action Grid */}
       <View style={styles.grid}>
-        <ActionButton icon="document-text" title="Generate Quote" color="#007AFF" onPress={() => router.push('/quoter')} />
-        <ActionButton icon="list" title="Audit Logs" color="#fbbc05" onPress={() => router.push('/audit')} />
+        <ActionButton icon="document-text" title="Generate Quote" color="#007AFF" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/quoter')} />
+        <ActionButton icon="list" title="Audit Logs" color="#fbbc05" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/audit')} />
+        <ActionButton icon="clipboard" title="Claims" color="#8e44ad" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/claims')} />
+        <ActionButton icon="lock-closed" title="Vault" color="#16a085" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/vault')} />
       </View>
     </ScrollView>
   );
 }
 
 // Reusable ActionButton
-function ActionButton({ icon, title, color, onPress }: any) {
+function ActionButton({ icon, title, color, onPress, surface, border, textColor }: any) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, { backgroundColor: surface, borderColor: border }]} onPress={onPress}>
       <View style={[styles.iconCircle, { backgroundColor: color + '15' }]}>
         <Ionicons name={icon} size={24} color={color} />
       </View>
-      <ThemedText style={styles.cardTitle}>{title}</ThemedText>
+      <ThemedText style={[styles.cardTitle, { color: textColor }]}>{title}</ThemedText>
     </TouchableOpacity>
   );
 }

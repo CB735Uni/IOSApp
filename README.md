@@ -8,3 +8,5 @@ Key features:
 - Vault = Brand it as "secure" as a selling point.
 - Quote generator = Instead of just handling invoicing, it also generates NDIS compliant quotes.
 - Offline capable = Handles evidence offline which can be synced later for rural providers with poor reception.
+
+npx expo start

@@ -5,11 +5,19 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export default function AuditVaultScreen() {
   const [files, setFiles] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isViewerVisible, setIsViewerVisible] = useState(false);
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
+  const surface = colorScheme === 'dark' ? '#1b2026' : '#fff';
+  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
+  const border = colorScheme === 'dark' ? '#2d3238' : '#f0f0f0';
+  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
 
   useEffect(() => {
     loadVault();
@@ -55,13 +63,13 @@ export default function AuditVaultScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
       <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Ionicons name="vault" size={24} color="#007AFF" />
           <ThemedText type="title">ModiProof™ Vault</ThemedText>
         </View>
-        <ThemedText style={styles.sub}>Secure NDIS Evidence Storage</ThemedText>
+        <ThemedText style={[styles.sub, { color: muted }]}>Secure NDIS Evidence Storage</ThemedText>
       </View>
 
       {/* Action Button */}
@@ -71,7 +79,7 @@ export default function AuditVaultScreen() {
       </TouchableOpacity>
 
       <ScrollView style={styles.fileList} showsVerticalScrollIndicator={false}>
-        <ThemedText style={styles.label}>Mandatory Audit Documents:</ThemedText>
+        <ThemedText style={[styles.label, { color: muted }]}>Mandatory Audit Documents:</ThemedText>
         
         {files.length === 0 && (
           <View style={styles.emptyState}>
@@ -81,7 +89,7 @@ export default function AuditVaultScreen() {
         )}
 
         {files.map((file) => (
-          <View key={file.id} style={styles.fileCard}>
+          <View key={file.id} style={[styles.fileCard, { backgroundColor: surface, borderColor: border }]}> 
             <View style={styles.iconCircle}>
               <Ionicons 
                 name={file.type === 'doc' ? "document-text" : "image"} 
@@ -90,8 +98,8 @@ export default function AuditVaultScreen() {
               />
             </View>
             <View style={styles.fileInfo}>
-              <ThemedText type="defaultSemiBold" numberOfLines={1}>{file.title}</ThemedText>
-              <ThemedText style={styles.dateText}>Verified: {file.date}</ThemedText>
+              <ThemedText type="defaultSemiBold" numberOfLines={1} style={{ color: palette.text }}>{file.title}</ThemedText>
+              <ThemedText style={[styles.dateText, { color: muted }]}>Verified: {file.date}</ThemedText>
             </View>
             <TouchableOpacity onPress={() => openViewer(file.uri)} style={styles.viewBtn}>
                <ThemedText style={styles.viewBtnText}>View</ThemedText>
@@ -125,9 +133,9 @@ export default function AuditVaultScreen() {
       </Modal>
 
       {/* Compliance Status */}
-      <View style={styles.guardBox}>
-        <Ionicons name="shield-checkmark" size={20} color="#155724" />
-        <ThemedText style={styles.guardText}>
+      <View style={[styles.guardBox, { backgroundColor: colorScheme === 'dark' ? '#102d1a' : '#d4edda', borderColor: colorScheme === 'dark' ? '#1f4a2f' : '#cce5d2' }]}>
+        <Ionicons name="shield-checkmark" size={20} color={colorScheme === 'dark' ? '#8ae2a2' : '#155724'} />
+        <ThemedText style={[styles.guardText, { color: colorScheme === 'dark' ? '#d8f5e3' : '#155724' }]}>
           PACE Status: {files.length > 2 ? "**Audit Ready**" : "**Incomplete**"}
         </ThemedText>
       </View>

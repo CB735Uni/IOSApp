@@ -5,6 +5,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 const NDIS_CODES = [
   { id: '1', title: 'External Grab Rail', code: '06_181806382_0111_2_2', price: 185 },
@@ -18,6 +20,12 @@ export default function QuoterScreen() {
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
+  const surface = colorScheme === 'dark' ? '#1b2026' : '#fff';
+  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
+  const border = colorScheme === 'dark' ? '#2d3238' : '#eee';
+  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
   
   const isFocused = useIsFocused();
   const totalPrice = estimate.reduce((s, i) => s + i.price, 0);
@@ -84,10 +92,10 @@ export default function QuoterScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
       <View style={styles.header}>
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-          <ThemedText type="subtitle">NDIS Quoter</ThemedText>
+          <ThemedText type="subtitle" style={{ color: palette.text }}>NDIS Quoter</ThemedText>
           <TouchableOpacity onPress={clearEstimate}>
             <ThemedText style={{color: '#ff4444', fontSize: 12}}>Reset</ThemedText>
           </TouchableOpacity>
@@ -97,9 +105,9 @@ export default function QuoterScreen() {
             Issuing as: {bizInfo.bizName}
           </ThemedText>
         ) : (
-          <View style={styles.infoBox}>
-            <Ionicons name="information-circle" size={20} color="#b8860b" />
-            <ThemedText style={styles.infoText}>
+          <View style={[styles.infoBox, { backgroundColor: colorScheme === 'dark' ? '#3a2d10' : '#fffbea', borderColor: colorScheme === 'dark' ? '#6a520f' : '#ffd966' }]}>
+            <Ionicons name="information-circle" size={20} color={colorScheme === 'dark' ? '#f5d26a' : '#b8860b'} />
+            <ThemedText style={[styles.infoText, { color: colorScheme === 'dark' ? '#f5d26a' : '#b8860b' }]}>
               Business profile required - Complete your organization details in Settings to generate quotes
             </ThemedText>
           </View>
@@ -107,32 +115,32 @@ export default function QuoterScreen() {
       </View>
 
       <View style={styles.pickerSection}>
-        <ThemedText style={styles.label}>Select Participant:</ThemedText>
+        <ThemedText style={[styles.label, { color: muted }]}>Select Participant:</ThemedText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          {clients.length === 0 && <ThemedText style={{fontSize: 12, color: '#999'}}>No clients found.</ThemedText>}
+          {clients.length === 0 && <ThemedText style={{fontSize: 12, color: muted}}>No clients found.</ThemedText>}
           {clients.map(c => (
             <TouchableOpacity 
               key={c.id} 
-              style={[styles.clientChip, selectedClient?.id === c.id && styles.activeChip]}
+              style={[styles.clientChip, { backgroundColor: surface, borderColor: border }, selectedClient?.id === c.id && styles.activeChip]}
               onPress={() => setSelectedClient(c)}
             >
-              <ThemedText style={[styles.chipText, selectedClient?.id === c.id && {color: '#fff'}]}>{c.name}</ThemedText>
+              <ThemedText style={[styles.chipText, { color: palette.text }, selectedClient?.id === c.id && {color: '#fff'}]}>{c.name}</ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <ThemedText style={styles.label}>Add Mod Items:</ThemedText>
+      <ThemedText style={[styles.label, { color: muted }]}>Add Mod Items:</ThemedText>
       <ScrollView style={styles.list}>
         {NDIS_CODES.map(item => (
           <TouchableOpacity 
             key={item.id} 
-            style={styles.itemRow} 
+            style={[styles.itemRow, { backgroundColor: surface, borderColor: border }]} 
             onPress={() => setEstimate([...estimate, item])}
           >
             <View>
-              <ThemedText type="defaultSemiBold">{item.title}</ThemedText>
-              <ThemedText style={styles.codeText}>{item.code}</ThemedText>
+              <ThemedText type="defaultSemiBold" style={{ color: palette.text }}>{item.title}</ThemedText>
+              <ThemedText style={[styles.codeText, { color: muted }]}>{item.code}</ThemedText>
             </View>
             <View style={{alignItems: 'flex-end'}}>
               <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
@@ -142,9 +150,9 @@ export default function QuoterScreen() {
         ))}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: border }]}>
         <View style={styles.totalRow}>
-          <ThemedText>Total (Inc. GST)</ThemedText>
+          <ThemedText style={{ color: palette.text }}>Total (Inc. GST)</ThemedText>
           <ThemedText type="title" style={{color: '#007AFF'}}>${totalPrice}</ThemedText>
         </View>
         <TouchableOpacity 
@@ -158,8 +166,8 @@ export default function QuoterScreen() {
       </View>
 
       <Modal visible={showPreview} animationType="slide">
-        <ThemedView style={styles.previewContainer}>
-          <View style={styles.previewHeader}>
+        <ThemedView style={[styles.previewContainer, { backgroundColor: surfaceAlt }]}> 
+          <View style={[styles.previewHeader, { backgroundColor: surface, borderBottomColor: border }]}> 
             <TouchableOpacity onPress={() => setShowPreview(false)}>
                <ThemedText style={{color: '#007AFF'}}>Back</ThemedText>
             </TouchableOpacity>
@@ -175,7 +183,7 @@ export default function QuoterScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.previewPaper}>
+            <ScrollView contentContainerStyle={[styles.previewPaper, { backgroundColor: surface }]}> 
               {/* --- WATERMARK LAYER --- */}
               <View style={styles.watermarkOverlay} pointerEvents="none">
                 <ThemedText style={styles.watermarkText}>AUDIT READY</ThemedText>
@@ -212,7 +220,7 @@ export default function QuoterScreen() {
                    <View key={index} style={styles.previewItemRow}>
                      <View style={{flex: 1}}>
                        <ThemedText>{item.title}</ThemedText>
-                       <ThemedText style={{fontSize: 10, color: '#666'}}>{item.code}</ThemedText>
+                      <ThemedText style={{fontSize: 10, color: muted}}>{item.code}</ThemedText>
                      </View>
                      <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
                    </View>
@@ -242,18 +250,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   header: { marginBottom: 15, marginTop: 10 },
   bizSub: { fontSize: 12, color: '#007AFF', fontWeight: 'bold', marginTop: 5 },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fffbea', padding: 12, borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#ffd966' },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8, marginTop: 8, borderWidth: 1 },
   infoText: { fontSize: 12, color: '#b8860b', flex: 1, lineHeight: 18 },
   label: { fontSize: 11, color: '#666', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
   pickerSection: { marginBottom: 20 },
   chipScroll: { flexDirection: 'row' },
-  clientChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, backgroundColor: '#eee', marginRight: 10, borderWidth: 1, borderColor: '#ddd' },
+  clientChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10, borderWidth: 1 },
   activeChip: { backgroundColor: '#007AFF', borderColor: '#0056b3' },
   chipText: { fontSize: 13 },
   list: { flex: 1 },
-  itemRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, alignItems: 'center', shadowOpacity: 0.05, elevation: 1 },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center', shadowOpacity: 0.05, elevation: 1, borderWidth: 1 },
   codeText: { fontSize: 10, color: '#888', marginTop: 4, fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier' },
-  footer: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 20 },
+  footer: { borderTopWidth: 1, paddingTop: 20 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
   btn: { padding: 18, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 },
   btnText: { color: '#fff', fontWeight: 'bold' },

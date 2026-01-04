@@ -4,11 +4,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 export default function ClientManager() {
   const [clients, setClients] = useState<any[]>([]);
   const [newName, setNewName] = useState('');
   const [newId, setNewId] = useState('');
+  const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
+  const surface = colorScheme === 'dark' ? '#1b2026' : '#fff';
+  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
+  const border = colorScheme === 'dark' ? '#2d3238' : '#eee';
+  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
 
   useEffect(() => { loadClients(); }, []);
 
@@ -32,13 +40,26 @@ export default function ClientManager() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">Client Manager</ThemedText>
+    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
+      <ThemedText type="title" style={{ color: palette.text, marginBottom: 6 }}>Client Manager</ThemedText>
       
       {/* Add New Client Form */}
-      <View style={styles.addBox}>
-        <TextInput style={styles.input} placeholder="Full Name" value={newName} onChangeText={setNewName} />
-        <TextInput style={styles.input} placeholder="NDIS Number" value={newId} onChangeText={setNewId} keyboardType="numeric" />
+      <View style={[styles.addBox, { backgroundColor: surface, borderColor: border }]}> 
+        <TextInput 
+          style={[styles.input, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]} 
+          placeholder="Full Name" 
+          placeholderTextColor={muted}
+          value={newName} 
+          onChangeText={setNewName} 
+        />
+        <TextInput 
+          style={[styles.input, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]} 
+          placeholder="NDIS Number" 
+          placeholderTextColor={muted}
+          value={newId} 
+          onChangeText={setNewId} 
+          keyboardType="numeric" 
+        />
         <TouchableOpacity style={styles.addBtn} onPress={addClient}>
           <ThemedText style={{color: '#fff', fontWeight: 'bold'}}>+ Add Client</ThemedText>
         </TouchableOpacity>
@@ -46,10 +67,10 @@ export default function ClientManager() {
 
       <ScrollView style={{marginTop: 20}}>
         {clients.map(client => (
-          <View key={client.id} style={styles.clientCard}>
+          <View key={client.id} style={[styles.clientCard, { backgroundColor: surface, borderColor: border }]}> 
             <View>
-              <ThemedText type="defaultSemiBold">{client.name}</ThemedText>
-              <ThemedText style={styles.idText}>NDIS: {client.ndisNum}</ThemedText>
+              <ThemedText type="defaultSemiBold" style={{ color: palette.text }}>{client.name}</ThemedText>
+              <ThemedText style={[styles.idText, { color: muted }]}>NDIS: {client.ndisNum}</ThemedText>
             </View>
             <TouchableOpacity onPress={() => deleteClient(client.id)}>
               <Ionicons name="trash-outline" size={20} color="#ff4444" />
@@ -63,9 +84,9 @@ export default function ClientManager() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  addBox: { backgroundColor: '#fff', padding: 15, borderRadius: 12, elevation: 3 },
-  input: { borderBottomWidth: 1, borderColor: '#eee', padding: 10, marginBottom: 10 },
+  addBox: { backgroundColor: '#fff', padding: 15, borderRadius: 12, elevation: 3, marginTop: 10, borderWidth: 1 },
+  input: { borderBottomWidth: 1, padding: 10, marginBottom: 10, borderWidth: 1, borderRadius: 8 },
   addBtn: { backgroundColor: '#007AFF', padding: 12, borderRadius: 8, alignItems: 'center' },
-  clientCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, alignItems: 'center' },
+  clientCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', padding: 15, borderRadius: 10, marginBottom: 10, alignItems: 'center', borderWidth: 1 },
   idText: { fontSize: 12, color: '#666' }
 });
