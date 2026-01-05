@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, ScrollView, View, TextInput, Alert, Modal, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -92,8 +93,9 @@ export default function QuoterScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
-      <View style={styles.header}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
+        <View style={styles.header}>
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
           <ThemedText type="subtitle" style={{ color: palette.text }}>NDIS Quoter</ThemedText>
           <TouchableOpacity onPress={clearEstimate}>
@@ -243,6 +245,7 @@ export default function QuoterScreen() {
         </ThemedView>
       </Modal>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

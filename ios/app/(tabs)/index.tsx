@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, View, Platform, Image, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, View, Platform, Image, Alert, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,24 +39,78 @@ export default function ModiProofDashboard() {
   const captureEvidence = async () => {
     setIsCapturing(true);
     try {
+
+      console.log('Starting evidence capture process...');
       // 1. Request Permissions
       const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
       const locationStatus = await Location.requestForegroundPermissionsAsync();
 
+      console.log('Location Permission Status:', JSON.stringify(locationStatus, null, 2));
+
       if (cameraStatus.status !== 'granted' || locationStatus.status !== 'granted') {
-        Alert.alert("Permission Required", "ModiProof needs Camera and GPS access to verify audit evidence.");
+        Alert.alert(
+          "Permission Required", 
+          "ModiProof needs Camera and GPS access to verify audit evidence.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() }
+          ]
+        );
+        setIsCapturing(false);
         return;
       }
 
-      // 2. Launch Camera
+      // 2. Check location accuracy BEFORE taking photo
+      console.log('Getting location to check accuracy...');
+      const testLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+
+      console.log('Location Data:', JSON.stringify(testLocation, null, 2));
+      console.log('Accuracy Value (meters):', testLocation.coords.accuracy);
+
+      // Check if iOS user has reduced accuracy enabled
+      if (Platform.OS === 'ios' && testLocation.coords.accuracy && testLocation.coords.accuracy > 100) {
+        Alert.alert(
+          "Precise Location Required",
+          `ModiProof requires precise location. Current accuracy: ${Math.round(testLocation.coords.accuracy)}m. Please enable 'Precise Location' in Settings.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() }
+          ]
+        );
+        setIsCapturing(false);
+        return;
+      }
+
+      // 3. Launch Camera
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         quality: 0.7,
       });
 
       if (!result.canceled) {
-        // 3. Get Real GPS Coordinates
-        const location = await Location.getCurrentPositionAsync({});
+        // 4. Get Real GPS Coordinates with highest accuracy
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
+        });
+
+        console.log('Location Data:', JSON.stringify(location, null, 2));
+        console.log('Accuracy Value:', location.coords.accuracy);
+
+        // Check if iOS user has reduced accuracy enabled
+        if (Platform.OS === 'ios' && location.coords.accuracy && location.coords.accuracy > 100) {
+          Alert.alert(
+            "Precise Location Required",
+            "ModiProof requires precise location to verify exact GPS coordinates. Your current accuracy is reduced. Please enable 'Precise Location' in Settings.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() }
+            ]
+          );
+          setIsCapturing(false);
+          return;
+        }
         
         const newPhoto = {
           id: Date.now().toString(),
@@ -75,10 +130,11 @@ export default function ModiProofDashboard() {
   };
 
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: surfaceAlt }]} 
-      contentContainerStyle={styles.content}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top', 'left', 'right']}>
+      <ScrollView 
+        style={[styles.container, { backgroundColor: surfaceAlt }]} 
+        contentContainerStyle={styles.content}
+      >
       <ThemedView style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Ionicons name="shield-checkmark" size={24} color="#007AFF" />
@@ -156,7 +212,8 @@ export default function ModiProofDashboard() {
         <ActionButton icon="clipboard" title="Claims" color="#8e44ad" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/claims')} />
         <ActionButton icon="lock-closed" title="Vault" color="#16a085" surface={surface} border={border} textColor={palette.text} onPress={() => router.push('/vault')} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, ScrollView, View, Image, Modal, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -63,8 +64,9 @@ export default function AuditVaultScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
-      <View style={styles.header}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
+        <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
           <Ionicons name="vault" size={24} color="#007AFF" />
           <ThemedText type="title">ModiProof™ Vault</ThemedText>
@@ -140,6 +142,7 @@ export default function AuditVaultScreen() {
         </ThemedText>
       </View>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

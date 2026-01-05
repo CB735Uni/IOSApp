@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, ScrollView, View, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,8 +27,9 @@ export default function AuditVaultScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
-      <View style={styles.header}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
+        <View style={styles.header}>
         <ThemedText type="title" style={{ color: palette.text }}>Audit Vault</ThemedText>
         <ThemedText style={[styles.sub, { color: muted }]}>Job: Smith Residence #4492</ThemedText>
       </View>
@@ -67,6 +69,7 @@ export default function AuditVaultScreen() {
         </ThemedText>
       </View>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

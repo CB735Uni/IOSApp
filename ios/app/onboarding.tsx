@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -236,12 +237,13 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ThemedView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ThemedView style={styles.container}>
+          <ScrollView contentContainerStyle={styles.content}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoCircle}>
@@ -279,6 +281,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="e.g., ModiCare Services Pty Ltd"
+                    placeholderTextColor="#999"
                     value={bizName}
                     onChangeText={(text) => {
                       setBizName(text);
@@ -298,6 +301,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="12 345 678 901"
+                    placeholderTextColor="#999"
                     value={abn}
                     onChangeText={(text) => {
                       setAbn(text);
@@ -324,6 +328,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="e.g., 4050012345"
+                    placeholderTextColor="#999"
                     value={ndisNumber}
                     onChangeText={(text) => {
                       setNdisNumber(text);
@@ -358,6 +363,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="123 Main Street, Melbourne VIC 3000"
+                    placeholderTextColor="#999"
                     value={address}
                     onChangeText={(text) => {
                       setAddress(text);
@@ -378,6 +384,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="(03) 1234 5678"
+                    placeholderTextColor="#999"
                     value={phone}
                     onChangeText={(text) => {
                       setPhone(text);
@@ -399,6 +406,7 @@ export default function OnboardingScreen() {
                   <TextInput 
                     style={styles.input}
                     placeholder="contact@yourcompany.com.au"
+                    placeholderTextColor="#999"
                     value={email}
                     onChangeText={(text) => {
                       setEmail(text);
@@ -502,13 +510,15 @@ export default function OnboardingScreen() {
         </Modal>
       </ThemedView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 30, paddingBottom: 100 },
-  header: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
+  header: { alignItems: 'center', marginBottom: 30, marginTop: 10 },
   logoCircle: { 
     width: 80, 
     height: 80, 
@@ -547,7 +557,7 @@ const styles = StyleSheet.create({
     gap: 10, 
     marginBottom: 8 
   },
-  stepTitle: { fontSize: 20 },
+  stepTitle: { fontSize: 20, fontWeight: '700', color: '#000' },
   stepDescription: { 
     fontSize: 13, 
     color: '#666', 

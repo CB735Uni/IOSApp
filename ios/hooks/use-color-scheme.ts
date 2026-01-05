@@ -53,4 +53,3 @@ export function useThemeColor(
 		return Colors[theme][colorName];
 	}
 }
-export { useColorScheme } from 'react-native';

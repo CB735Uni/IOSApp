@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, ScrollView, View, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -40,8 +41,9 @@ export default function ClientManager() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
-      <ThemedText type="title" style={{ color: palette.text, marginBottom: 6 }}>Client Manager</ThemedText>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
+        <ThemedText type="title" style={{ color: palette.text, marginBottom: 6 }}>Client Manager</ThemedText>
       
       {/* Add New Client Form */}
       <View style={[styles.addBox, { backgroundColor: surface, borderColor: border }]}> 
@@ -79,6 +81,7 @@ export default function ClientManager() {
         ))}
       </ScrollView>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

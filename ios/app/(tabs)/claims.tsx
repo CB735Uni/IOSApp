@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,9 +31,10 @@ export default function ClaimsScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
-      {/* 1. Cash Flow Overview */}
-      <View style={styles.summaryGrid}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
+        {/* 1. Cash Flow Overview */}
+        <View style={styles.summaryGrid}>
         <View style={[styles.summaryCard, { backgroundColor: summaryTint1, borderColor: border }] }>
           <ThemedText style={[styles.summaryLabel, { color: muted }]}>Owed (Pending)</ThemedText>
           <ThemedText style={[styles.summaryAmount, { color: palette.text }]}>$4,050</ThemedText>
@@ -100,6 +102,7 @@ export default function ClaimsScreen() {
         </View>
       </Modal>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

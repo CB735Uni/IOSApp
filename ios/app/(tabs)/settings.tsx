@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View, Alert, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -157,8 +158,9 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
+      <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <ThemedText type="title" style={[styles.header, { color: palette.text }]}>Business Profile</ThemedText>
         <ThemedText style={[styles.sub, { color: textMuted }]}>These details will appear on all generated NDIS quotes.</ThemedText>
 
@@ -308,6 +310,7 @@ export default function SettingsScreen() {
         </View>
       </Modal>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 
