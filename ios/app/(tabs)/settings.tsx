@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, TextInput, TouchableOpacity, View, Alert, ScrollView } from 'react-native';
+import { StyleSheet, TextInput, TouchableOpacity, View, Alert, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +14,9 @@ export default function SettingsScreen() {
   const [abn, setAbn] = useState('');
   const [providerNum, setProviderNum] = useState('');
   const [themePreference, setThemePreference] = useState<'auto' | 'light' | 'dark'>('auto');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ bizName?: string; abn?: string; providerNum?: string }>({});
   const router = useRouter();
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? 'light'];
@@ -45,7 +48,54 @@ export default function SettingsScreen() {
     }
   };
 
+  const validateABN = (abn: string): boolean => {
+    const clean = abn.replace(/\s/g, '');
+    // Must be 11 digits, no letters, cannot start with 0
+    if (!/^(?!0)\d{11}$/.test(clean)) return false;
+
+    // Official ABN checksum (weights 10,1,3,5,7,9,11,13,15,17,19)
+    const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+    const digits = clean.split('').map(Number);
+    digits[0] = digits[0] - 1; // subtract 1 from first digit
+    const sum = digits.reduce((acc, digit, idx) => acc + digit * weights[idx], 0);
+    return sum % 89 === 0;
+  };
+
+  const validateProviderNum = (num: string): boolean => {
+    // Provider number should be 9 digits
+    return /^\d{9}$/.test(num);
+  };
+
   const saveSettings = async () => {
+    // Clear previous errors
+    setErrors({});
+
+    // Validate inputs
+    const newErrors: { bizName?: string; abn?: string; providerNum?: string } = {};
+
+    if (!bizName.trim()) {
+      newErrors.bizName = 'Business name is required';
+    }
+
+    if (!abn.trim()) {
+      newErrors.abn = 'ABN is required';
+    } else if (!validateABN(abn)) {
+      newErrors.abn = 'ABN must be valid: 11 digits, not starting with 0, digits only, and pass the official checksum (e.g., 12 345 678 901)';
+    }
+
+    if (!providerNum.trim()) {
+      newErrors.providerNum = 'Provider number is required';
+    } else if (!validateProviderNum(providerNum)) {
+      newErrors.providerNum = 'Provider number must be 9 digits';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
       const settings = { bizName, abn, providerNum, themePreference };
       await AsyncStorage.setItem('@provider_settings', JSON.stringify(settings));
@@ -53,6 +103,8 @@ export default function SettingsScreen() {
       Alert.alert("Success", "NDIS Credentials Saved!");
     } catch (e) {
       Alert.alert("Error", "Could not save settings.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -73,17 +125,35 @@ export default function SettingsScreen() {
 
   // --- NEW LOGOUT LOGIC ---
   const handleLogout = async () => {
-    Alert.alert("Sign Out", "Are you sure you want to log out of ModiProof?", [
-      { text: "Cancel", style: "cancel" },
-      { 
-        text: "Logout", 
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem('userToken'); // Clear session
-          router.replace('/auth'); // Redirect to login
-        }
-      }
-    ]);
+    console.log('handleLogout called');
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    try 
+    {
+      console.log('Logout confirmed, removing token');
+      // Clear all authentication and settings data
+      await AsyncStorage.removeItem('userToken');
+      await AsyncStorage.removeItem('@provider_settings');
+      await AsyncStorage.removeItem('@theme_preference');
+      await AsyncStorage.removeItem('@onboarding_complete');
+      console.log('All auth data cleared');
+      
+      // Force navigation to auth screen
+      setTimeout(() => {
+        console.log('Navigating to auth');
+        router.replace('/auth');
+      }, 100);
+    } catch (error) {
+      console.error('Error during logout:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   return (
@@ -93,35 +163,68 @@ export default function SettingsScreen() {
         <ThemedText style={[styles.sub, { color: textMuted }]}>These details will appear on all generated NDIS quotes.</ThemedText>
 
         <View style={[styles.form, { backgroundColor: surface, borderColor: border }]}> 
-          <ThemedText style={styles.label}>Registered Business Name</ThemedText>
+          <ThemedText style={[styles.label, { color: palette.text }]}>Registered Business Name</ThemedText>
           <TextInput 
-            style={[styles.input, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]} 
+            style={[
+              styles.input, 
+              { backgroundColor: surfaceAlt, borderColor: errors.bizName ? '#ff4444' : border, color: palette.text }
+            ]} 
             value={bizName} 
-            onChangeText={setBizName} 
+            onChangeText={(text) => {
+              setBizName(text);
+              if (errors.bizName) setErrors({ ...errors, bizName: undefined });
+            }}
             placeholder="e.g. ModiProof Building Co."
             placeholderTextColor={colorScheme === 'dark' ? '#7c828a' : '#999'}
+            editable={!isLoading}
           />
+          {errors.bizName && (
+            <ThemedText style={styles.errorText}>{errors.bizName}</ThemedText>
+          )}
 
-          <ThemedText style={styles.label}>ABN</ThemedText>
+          <ThemedText style={[styles.label, { color: palette.text }]}>ABN</ThemedText>
           <TextInput 
-            style={[styles.input, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]} 
+            style={[
+              styles.input, 
+              { backgroundColor: surfaceAlt, borderColor: errors.abn ? '#ff4444' : border, color: palette.text }
+            ]} 
             value={abn} 
-            onChangeText={setAbn} 
+            onChangeText={(text) => {
+              setAbn(text);
+              if (errors.abn) setErrors({ ...errors, abn: undefined });
+            }}
             placeholder="00 000 000 000"
             keyboardType="numeric"
             placeholderTextColor={colorScheme === 'dark' ? '#7c828a' : '#999'}
+            maxLength={13}
+            editable={!isLoading}
           />
+          {errors.abn && (
+            <ThemedText style={styles.errorText}>{errors.abn}</ThemedText>
+          )}
 
-          <ThemedText style={styles.label}>NDIS Provider Number (PRODA)</ThemedText>
+          <ThemedText style={[styles.label, { color: palette.text }]}>NDIS Provider Number (PRODA)</ThemedText>
           <TextInput 
-            style={[styles.input, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]} 
+            style={[
+              styles.input, 
+              { backgroundColor: surfaceAlt, borderColor: errors.providerNum ? '#ff4444' : border, color: palette.text }
+            ]} 
             value={providerNum} 
-            onChangeText={setProviderNum} 
+            onChangeText={(text) => {
+              setProviderNum(text);
+              if (errors.providerNum) setErrors({ ...errors, providerNum: undefined });
+            }}
             placeholder="405000000"
+            keyboardType="numeric"
+            maxLength={9}
             placeholderTextColor={colorScheme === 'dark' ? '#7c828a' : '#999'}
+            editable={!isLoading}
           />
+          {errors.providerNum && (
+            <ThemedText style={styles.errorText}>{errors.providerNum}</ThemedText>
+          )}
 
-          <ThemedText style={styles.label}>Theme</ThemedText>
+          <ThemedText style={[styles.label, { color: palette.text }]}>Theme</ThemedText>
           <View style={styles.themeRow}>
             {['auto', 'light', 'dark'].map(option => (
               <TouchableOpacity
@@ -141,9 +244,19 @@ export default function SettingsScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={saveSettings}>
-            <Ionicons name="save" size={20} color="#fff" />
-            <ThemedText style={styles.saveText}>Save Credentials</ThemedText>
+          <TouchableOpacity 
+            style={[styles.saveBtn, isLoading && styles.saveBtnDisabled]} 
+            onPress={saveSettings}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="save" size={20} color="#fff" />
+                <ThemedText style={styles.saveText}>Save Credentials</ThemedText>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -156,16 +269,44 @@ export default function SettingsScreen() {
 
         {/* --- ACCOUNT ACTIONS --- */}
         <View style={styles.accountSection}>
-          <ThemedText style={styles.label}>Account Actions</ThemedText>
+          <ThemedText style={[styles.label, { color: palette.text }]}>Account Actions</ThemedText>
           
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: surface }]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#ff4444" />
-            <ThemedText style={styles.logoutText}>Sign Out of ModiProof</ThemedText>
+            <ThemedText style={[styles.logoutText, { color: '#ff4444' }]}>Sign Out of ModiProof</ThemedText>
           </TouchableOpacity>
           
-          <ThemedText style={styles.versionText}>v1.0.4 - Secure Build</ThemedText>
+          <ThemedText style={[styles.versionText, { color: textMuted }]}>v1.0.4 - Secure Build</ThemedText>
         </View>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={cancelLogout}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: surface, borderColor: border }]}>
+            <ThemedText style={[styles.modalTitle, { color: palette.text }]}>Sign Out</ThemedText>
+            <ThemedText style={[styles.modalMessage, { color: textMuted }]}>
+              Are you sure you want to log out of ModiProof?
+            </ThemedText>
+            
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: surfaceAlt, borderColor: border }]} 
+                onPress={cancelLogout}
+              >
+                <ThemedText style={[styles.modalButtonText, { color: palette.text }]}>Cancel</ThemedText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonDanger]} 
+                onPress={confirmLogout}
+              >
+                <ThemedText style={styles.modalButtonTextDanger}>Logout</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -173,16 +314,20 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   header: { marginTop: 20 },
-  sub: { color: '#666', fontSize: 14, marginBottom: 30 },
-  form: { backgroundColor: '#fff', padding: 20, borderRadius: 15, elevation: 2, borderWidth: 1 },
-  label: { fontSize: 11, fontWeight: 'bold', marginBottom: 8, color: '#333', textTransform: 'uppercase' },
+  sub: { fontSize: 14, marginBottom: 30 },
+  form: { padding: 20, borderRadius: 15, elevation: 2, borderWidth: 1 },
+  label: { fontSize: 11, fontWeight: 'bold', marginBottom: 8, textTransform: 'uppercase' },
   input: { 
-    backgroundColor: '#f9f9f9', 
     padding: 12, 
     borderRadius: 8, 
     borderWidth: 1, 
-    borderColor: '#ddd', 
-    marginBottom: 20 
+    marginBottom: 8
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 11,
+    marginBottom: 15,
+    marginTop: -4,
   },
   saveBtn: { 
     backgroundColor: '#34a853', 
@@ -192,11 +337,14 @@ const styles = StyleSheet.create({
     borderRadius: 10, 
     alignItems: 'center' 
   },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
   saveText: { color: '#fff', fontWeight: 'bold', marginLeft: 10 },
-  infoBox: { flexDirection: 'row', marginTop: 30, padding: 15, backgroundColor: '#e3f2fd', borderRadius: 10 },
-  infoText: { color: '#007AFF', fontSize: 12, marginLeft: 10, flex: 1 },
+  infoBox: { flexDirection: 'row', marginTop: 30, padding: 15, borderRadius: 10 },
+  infoText: { fontSize: 12, marginLeft: 10, flex: 1 },
   themeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  themePill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#007AFF', backgroundColor: '#f5f8ff' },
+  themePill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#007AFF' },
   themePillActive: { backgroundColor: '#007AFF' },
   themeText: { color: '#007AFF', fontWeight: '600' },
   themeTextActive: { color: '#fff' },
@@ -210,9 +358,57 @@ const styles = StyleSheet.create({
     padding: 15, 
     borderWidth: 1, 
     borderColor: '#ff4444', 
-    borderRadius: 10,
-    backgroundColor: '#fff'
+    borderRadius: 10
   },
   logoutText: { color: '#ff4444', fontWeight: 'bold', marginLeft: 10 },
-  versionText: { textAlign: 'center', color: '#ccc', fontSize: 10, marginTop: 15 }
+  versionText: { textAlign: 'center', fontSize: 10, marginTop: 15 },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    borderRadius: 12,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 14,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  modalButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalButtonDanger: {
+    backgroundColor: '#ff4444',
+    borderColor: '#ff4444',
+  },
+  modalButtonTextDanger: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });
