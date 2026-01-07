@@ -21,6 +21,7 @@ const MAPPING = {
   'person.2.fill': 'people',
   'lock.fill': 'lock',
   'gearshape.fill': 'settings',
+  'line.3.horizontal': 'menu',
 } as IconMapping;
 
 /**

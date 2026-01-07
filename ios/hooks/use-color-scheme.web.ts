@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
 const THEME_KEY = '@theme_preference';
@@ -19,27 +19,29 @@ export async function setStoredThemePreference(pref: ThemePref) {
 export function useColorScheme() {
   const systemScheme = useRNColorScheme();
   const [preference, setPreference] = useState<ThemePref>('auto');
-  const [resolvedScheme, setResolvedScheme] = useState<'light' | 'dark'>(systemScheme ?? 'light');
+  const isLoadingRef = useRef(true);
 
   useEffect(() => {
-    const loadPref = () => {
-      try {
-        const stored = typeof window !== 'undefined' ? window.localStorage.getItem(THEME_KEY) : null;
-        if (stored === 'light' || stored === 'dark' || stored === 'auto') {
-          setPreference(stored);
-        }
-      } catch {}
-    };
-    loadPref();
+    if (isLoadingRef.current) {
+      const loadPref = () => {
+        try {
+          const stored = typeof window !== 'undefined' ? window.localStorage.getItem(THEME_KEY) : null;
+          if (stored === 'light' || stored === 'dark' || stored === 'auto') {
+            setPreference(stored);
+          }
+        } catch {}
+        isLoadingRef.current = false;
+      };
+      loadPref();
+    }
 
     const listener = (pref: ThemePref) => setPreference(pref);
     listeners.add(listener);
     return () => listeners.delete(listener);
   }, []);
 
-  useEffect(() => {
-    setResolvedScheme(preference === 'auto' ? (systemScheme ?? 'light') : preference);
+  return useMemo(() => {
+    if (preference === 'auto') return systemScheme ?? 'light';
+    return preference;
   }, [preference, systemScheme]);
-
-  return resolvedScheme;
 }

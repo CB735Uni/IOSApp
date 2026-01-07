@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, View, TextInput, Alert, Modal, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { StyleSheet, TouchableOpacity, ScrollView, View, TextInput, Alert, Modal, FlatList, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Print from 'expo-print';
+import { shareAsync } from 'expo-sharing';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,282 +18,340 @@ const NDIS_CODES = [
 ];
 
 export default function QuoterScreen() {
+  const isFocused = useIsFocused();
+  const theme = useColorScheme();
+  
+  const { palette, surface, surfaceAlt, border, muted } = useMemo(() => {
+    const p = Colors[theme ?? 'light'];
+    return {
+      palette: p,
+      surface: theme === 'dark' ? '#1b2026' : '#fff',
+      surfaceAlt: theme === 'dark' ? '#0f1216' : '#f8f9fa',
+      border: theme === 'dark' ? '#2d3238' : '#eee',
+      muted: theme === 'dark' ? '#aeb3b9' : '#666',
+    };
+  }, [theme]);
+
   const [estimate, setEstimate] = useState<any[]>([]);
   const [bizInfo, setBizInfo] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const colorScheme = useColorScheme();
-  const palette = Colors[colorScheme ?? 'light'];
-  const surface = colorScheme === 'dark' ? '#1b2026' : '#fff';
-  const surfaceAlt = colorScheme === 'dark' ? '#0f1216' : '#f8f9fa';
-  const border = colorScheme === 'dark' ? '#2d3238' : '#eee';
-  const muted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
-  
-  const isFocused = useIsFocused();
-  const totalPrice = estimate.reduce((s, i) => s + i.price, 0);
+  const [showClientPicker, setShowClientPicker] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+
+  const totalPrice = useMemo(() => 
+    estimate.reduce((sum, item) => sum + (item.price * item.qty), 0)
+  , [estimate]);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [savedBiz, savedClients] = await Promise.all([
+        AsyncStorage.getItem('@provider_settings'),
+        AsyncStorage.getItem('@ndis_clients')
+      ]);
+      if (savedBiz) setBizInfo(JSON.parse(savedBiz));
+      if (savedClients) setClients(JSON.parse(savedClients));
+    } catch (e) {
+      console.error("Failed to load data", e);
+    }
+  }, []);
+
+  const themeColors = useMemo(() => ({
+    primary: '#0066cc',
+    headerText: theme === 'dark' ? '#e5e7eb' : '#1f2937',
+    itemBg: theme === 'dark' ? '#2d3238' : '#f3f4f6',
+  }), [theme]);
 
   useEffect(() => {
-    if (isFocused) {
-      loadData();
-    }
-  }, [isFocused]);
+    if (isFocused) loadData();
+  }, [isFocused, loadData]);
 
-  const loadData = async () => {
-    const savedBiz = await AsyncStorage.getItem('@provider_settings');
-    const savedClients = await AsyncStorage.getItem('@ndis_clients');
-    if (savedBiz) setBizInfo(JSON.parse(savedBiz));
-    if (savedClients) setClients(JSON.parse(savedClients));
-  };
+  // Deep search logic
+  const filteredClients = useMemo(() => {
+    const query = clientSearch.toLowerCase();
+    if (!query) return clients;
+    return clients.filter(c => 
+      c.name?.toLowerCase().includes(query) || 
+      c.ndisNum?.includes(query) ||
+      c.address?.toLowerCase().includes(query) ||
+      c.notes?.toLowerCase().includes(query)
+    );
+  }, [clients, clientSearch]);
 
-  const saveToAuditLog = async () => {
-    try {
-      const logEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date().toLocaleString('en-AU'),
-        clientName: selectedClient?.name || 'Unknown Client',
-        total: totalPrice,
-        itemCount: estimate.length,
-        builder: bizInfo?.bizName || 'Unknown Builder'
-      };
-
-      const existingLogsRaw = await AsyncStorage.getItem('@audit_logs');
-      const existingLogs = existingLogsRaw ? JSON.parse(existingLogsRaw) : [];
-      
-      const updatedLogs = [logEntry, ...existingLogs];
-      await AsyncStorage.setItem('@audit_logs', JSON.stringify(updatedLogs));
-    } catch (e) {
-      console.error("Failed to save audit log", e);
-    }
-  };
-
-  const handleShare = async () => {
-    const shareDetails = {
-      title: `NDIS Quote - ${selectedClient?.name}`,
-      text: `Hi ${selectedClient?.name}, here is your NDIS Home Mod quote from ${bizInfo?.bizName}.\n\nTotal: $${totalPrice}\nNDIS No: ${selectedClient?.ndisNum}\n\nGenerated via ModiProof™.`,
-    };
-
-    if (Platform.OS === 'web' && navigator.share) {
-      try {
-        await navigator.share(shareDetails);
-      } catch (error) {
-        console.log("Error sharing:", error);
+  const addItem = (codeItem: any) => {
+    setEstimate(prev => {
+      const existing = prev.find(i => i.id === codeItem.id);
+      if (existing) {
+        return prev.map(i => i.id === codeItem.id ? { ...i, qty: i.qty + 1 } : i);
       }
-    } else {
-      Alert.alert("Quote Summary Copied", shareDetails.text);
-    }
+      return [...prev, { ...codeItem, qty: 1 }];
+    });
   };
 
-  const handleGeneratePress = () => {
-    saveToAuditLog();
-    setShowPreview(true);
+  const updateQty = (id: string, delta: number) => {
+    setEstimate(prev => prev.map(i => {
+      if (i.id === id) {
+        const newQty = Math.max(0, i.qty + delta);
+        return { ...i, qty: newQty };
+      }
+      return i;
+    }).filter(i => i.qty > 0));
   };
 
-  const clearEstimate = () => {
-    setEstimate([]);
-    setSelectedClient(null);
+  const generatePDF = async () => {
+    const quoteNo = `QT-${Date.now().toString().slice(-8)}`;
+    const quoteDate = new Date().toLocaleDateString('en-AU');
+    const html = `
+      <html>
+        <head>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Helvetica'; padding: 30px; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0066cc; padding-bottom: 20px; margin-bottom: 20px; }
+            .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .items-table th { background: #f3f4f6; text-align: left; padding: 10px; font-size: 10px; }
+            .items-table td { padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; }
+            .total-row { background: #f0f4ff; padding: 15px; border: 1px solid #0066cc; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              ${bizInfo?.logoBase64 ? `<img class="logo" src="data:image/png;base64,${bizInfo.logoBase64}" />` : ''}
+              <div><h1>${bizInfo?.bizName || 'Service Provider'}</h1><p>ABN: ${bizInfo?.abn || 'N/A'}</p></div>
+            </div>
+            <div style="text-align: right"><h2>QUOTE</h2><p>No: ${quoteNo}</p></div>
+          </div>
+          <div>
+            <strong>Participant:</strong> ${selectedClient?.name}<br/>
+            NDIS: ${selectedClient?.ndisNum}<br/>
+            ${selectedClient?.address || ''}
+          </div>
+          <table class="items-table">
+            <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+            <tbody>
+              ${estimate.map(item => `
+                <tr>
+                  <td>${item.title}<br/><small>${item.code}</small></td>
+                  <td>${item.qty}</td>
+                  <td>$${item.price.toFixed(2)}</td>
+                  <td>$${(item.price * item.qty).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="total-row"><strong>TOTAL: $${totalPrice.toFixed(2)}</strong></div>
+        </body>
+      </html>
+    `;
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await shareAsync(uri);
+    } catch (e) { Alert.alert("Error", "Failed to generate PDF"); }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
       <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}> 
         <View style={styles.header}>
-        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-          <ThemedText type="subtitle" style={{ color: palette.text }}>NDIS Quoter</ThemedText>
-          <TouchableOpacity onPress={clearEstimate}>
-            <ThemedText style={{color: '#ff4444', fontSize: 12}}>Reset</ThemedText>
-          </TouchableOpacity>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+            <ThemedText type="subtitle">NDIS Quoter</ThemedText>
+            <TouchableOpacity onPress={() => { setEstimate([]); setSelectedClient(null); }}>
+              <ThemedText style={{color: '#ff4444', fontSize: 12}}>Reset All</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
-        {bizInfo ? (
-          <ThemedText style={styles.bizSub}>
-            Issuing as: {bizInfo.bizName}
-          </ThemedText>
-        ) : (
-          <View style={[styles.infoBox, { backgroundColor: colorScheme === 'dark' ? '#3a2d10' : '#fffbea', borderColor: colorScheme === 'dark' ? '#6a520f' : '#ffd966' }]}>
-            <Ionicons name="information-circle" size={20} color={colorScheme === 'dark' ? '#f5d26a' : '#b8860b'} />
-            <ThemedText style={[styles.infoText, { color: colorScheme === 'dark' ? '#f5d26a' : '#b8860b' }]}>
-              Business profile required - Complete your organization details in Settings to generate quotes
-            </ThemedText>
+
+        {/* Participant Selector - Full Details Restored */}
+        <View style={styles.pickerSection}>
+          <ThemedText style={styles.label}>Participant</ThemedText>
+          {selectedClient ? (
+            <View style={[styles.selectedCard, { backgroundColor: surface, borderColor: border }]}>
+              <View style={{flex: 1}}>
+                <ThemedText type="defaultSemiBold" style={{fontSize: 16}}>{selectedClient.name}</ThemedText>
+                <ThemedText style={{fontSize: 12, color: '#007AFF', fontWeight: 'bold'}}>NDIS: {selectedClient.ndisNum}</ThemedText>
+                {selectedClient.address && (
+                  <ThemedText style={{fontSize: 11, color: muted, marginTop: 4}}><Ionicons name="location-outline" size={12}/> {selectedClient.address}</ThemedText>
+                )}
+                {selectedClient.notes && (
+                  <View style={{marginTop: 6, padding: 6, backgroundColor: surfaceAlt, borderRadius: 4}}>
+                    <ThemedText style={{fontSize: 10, color: muted}}><Ionicons name="document-text-outline" size={10}/> {selectedClient.notes}</ThemedText>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setSelectedClient(null)}><Ionicons name="close-circle" size={28} color="#ff4444" /></TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={[styles.selectBtn, { backgroundColor: surface, borderColor: border }]} onPress={() => setShowClientPicker(true)}>
+              <Ionicons name="person-outline" size={18} color="#007AFF" />
+              <ThemedText style={{color: '#007AFF'}}>Select Client</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* RESTORED ESTIMATE SECTION WITH LINE TOTALS */}
+        {estimate.length > 0 && (
+          <View style={{ maxHeight: 180, marginBottom: 15 }}>
+            <ThemedText style={styles.label}>Items to Quote</ThemedText>
+            <ScrollView style={[styles.cartBox, { backgroundColor: surface, borderColor: border }]}>
+              {estimate.map(item => (
+                <View key={item.id} style={styles.cartRow}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontSize: 13 }} numberOfLines={1}>{item.title}</ThemedText>
+                    {/* Display subtotal for this line item */}
+                    <ThemedText style={{ fontSize: 11, color: '#007AFF', fontWeight: 'bold' }}>
+                      ${(item.price * item.qty).toFixed(2)}
+                    </ThemedText>
+                  </View>
+                  
+                  <View style={styles.qtyControls}>
+                    <TouchableOpacity onPress={() => updateQty(item.id, -1)}>
+                      <Ionicons name="remove-circle-outline" size={24} color={muted} />
+                    </TouchableOpacity>
+                    
+                    <ThemedText style={{ width: 30, textAlign: 'center', fontWeight: 'bold', color: palette.text }}>
+                      {item.qty}
+                    </ThemedText>
+                    
+                    <TouchableOpacity onPress={() => updateQty(item.id, 1)}>
+                      <Ionicons name="add-circle-outline" size={24} color="#007AFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
-      </View>
 
-      <View style={styles.pickerSection}>
-        <ThemedText style={[styles.label, { color: muted }]}>Select Participant:</ThemedText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          {clients.length === 0 && <ThemedText style={{fontSize: 12, color: muted}}>No clients found.</ThemedText>}
-          {clients.map(c => (
-            <TouchableOpacity 
-              key={c.id} 
-              style={[styles.clientChip, { backgroundColor: surface, borderColor: border }, selectedClient?.id === c.id && styles.activeChip]}
-              onPress={() => setSelectedClient(c)}
-            >
-              <ThemedText style={[styles.chipText, { color: palette.text }, selectedClient?.id === c.id && {color: '#fff'}]}>{c.name}</ThemedText>
+        {/* Restore Catalog Section */}
+        <ThemedText style={styles.label}>Catalog</ThemedText>
+        <ScrollView style={{flex: 1}}>
+          {NDIS_CODES.map(item => (
+            <TouchableOpacity key={item.id} style={[styles.itemRow, { backgroundColor: surface, borderColor: border }]} onPress={() => addItem(item)}>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="defaultSemiBold" style={{fontSize: 14, color: palette.text}}>{item.title}</ThemedText>
+                <ThemedText style={{fontSize: 10, color: muted}}>{item.code}</ThemedText>
+              </View>
+              <ThemedText type="defaultSemiBold" style={{color: palette.text}}>${item.price}</ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      </View>
 
-      <ThemedText style={[styles.label, { color: muted }]}>Add Mod Items:</ThemedText>
-      <ScrollView style={styles.list}>
-        {NDIS_CODES.map(item => (
-          <TouchableOpacity 
-            key={item.id} 
-            style={[styles.itemRow, { backgroundColor: surface, borderColor: border }]} 
-            onPress={() => setEstimate([...estimate, item])}
-          >
-            <View>
-              <ThemedText type="defaultSemiBold" style={{ color: palette.text }}>{item.title}</ThemedText>
-              <ThemedText style={[styles.codeText, { color: muted }]}>{item.code}</ThemedText>
-            </View>
-            <View style={{alignItems: 'flex-end'}}>
-              <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
-              <Ionicons name="add-circle" size={18} color="#007AFF" />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={[styles.footer, { borderTopColor: border }]}>
-        <View style={styles.totalRow}>
-          <ThemedText style={{ color: palette.text }}>Total (Inc. GST)</ThemedText>
-          <ThemedText type="title" style={{color: '#007AFF'}}>${totalPrice}</ThemedText>
-        </View>
-        <TouchableOpacity 
-          style={[styles.btn, { backgroundColor: (bizInfo && selectedClient && estimate.length > 0) ? '#007AFF' : '#ccc' }]} 
-          onPress={handleGeneratePress}
-          disabled={!bizInfo || !selectedClient || estimate.length === 0}
-        >
-          <Ionicons name="shield-checkmark" size={20} color="#fff" />
-          <ThemedText style={styles.btnText}>Review & Log Quote</ThemedText>
-        </TouchableOpacity>
-      </View>
-
-      <Modal visible={showPreview} animationType="slide">
-        <ThemedView style={[styles.previewContainer, { backgroundColor: surfaceAlt }]}> 
-          <View style={[styles.previewHeader, { backgroundColor: surface, borderBottomColor: border }]}> 
-            <TouchableOpacity onPress={() => setShowPreview(false)}>
-               <ThemedText style={{color: '#007AFF'}}>Back</ThemedText>
-            </TouchableOpacity>
-            <ThemedText type="defaultSemiBold">Compliance Preview</ThemedText>
-            <View style={{flexDirection: 'row', gap: 20}}>
-              <TouchableOpacity onPress={handleShare}>
-                 <Ionicons name="share-outline" size={24} color="#007AFF" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => Platform.OS === 'web' ? window.print() : Alert.alert("Print", "Connect to AirPrint device")}>
-                 <Ionicons name="print" size={24} color="#007AFF" />
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.footer, { borderTopColor: border }]}>
+          <View style={styles.totalRow}>
+            <ThemedText>Total (Inc. GST)</ThemedText>
+            <ThemedText type="title" style={{color: '#007AFF'}}>${totalPrice.toFixed(2)}</ThemedText>
           </View>
+          <TouchableOpacity 
+            style={[styles.btn, { backgroundColor: (bizInfo && selectedClient && estimate.length > 0) ? '#007AFF' : '#ccc' }]} 
+            onPress={() => setShowPreview(true)}
+            disabled={!bizInfo || !selectedClient || estimate.length === 0}
+          >
+            <ThemedText style={{color: '#fff', fontWeight: 'bold'}}>Review & Export</ThemedText>
+          </TouchableOpacity>
+        </View>
 
-          <View style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={[styles.previewPaper, { backgroundColor: surface }]}> 
-              {/* --- WATERMARK LAYER --- */}
-              <View style={styles.watermarkOverlay} pointerEvents="none">
-                <ThemedText style={styles.watermarkText}>AUDIT READY</ThemedText>
-                <ThemedText style={styles.watermarkSub}>MODIPROOF™ SECURE</ThemedText>
+        {/* Client Picker Modal - Search & Full Details Restored */}
+        <Modal visible={showClientPicker} animationType="slide">
+          <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }}>
+            <View style={[styles.modalHeader, { borderBottomColor: border, backgroundColor: surface }]}>
+              <TouchableOpacity onPress={() => { setShowClientPicker(false); setClientSearch(''); }} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={24} color="#007AFF" />
+                <ThemedText style={{color: '#007AFF', fontWeight: 'bold'}}>Back</ThemedText>
+              </TouchableOpacity>
+              <ThemedText type="defaultSemiBold">Select Client</ThemedText>
+              <View style={{width: 60}} />
+            </View>
+
+            <View style={{ padding: 15, backgroundColor: surface }}>
+              <View style={[styles.searchContainer, { backgroundColor: surfaceAlt, borderColor: border }]}>
+                <Ionicons name="search" size={20} color={muted} style={{ marginRight: 10 }} />
+                <TextInput
+                  placeholder="Search name, address, or notes..."
+                  placeholderTextColor={muted}
+                  style={{ flex: 1, color: palette.text, height: 45 }}
+                  value={clientSearch}
+                  onChangeText={setClientSearch}
+                />
+                {clientSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setClientSearch('')}>
+                    <Ionicons name="close-circle" size={22} color={muted} />
+                  </TouchableOpacity>
+                )}
               </View>
+            </View>
 
-              <View style={styles.paperHeader}>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                  <View>
-                    <ThemedText type="title" style={{fontSize: 22}}>{bizInfo?.bizName}</ThemedText>
-                    <ThemedText style={{fontSize: 10, color: '#666'}}>ABN: {bizInfo?.abn}</ThemedText>
-                  </View>
-                  <View style={{alignItems: 'flex-end'}}>
-                    <ThemedText style={styles.brandTrademark}>ModiProof™</ThemedText>
-                    <ThemedText style={{fontSize: 8, color: '#aaa'}}>OFFICIAL RECORD</ThemedText>
+            <FlatList 
+              data={filteredClients}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[styles.modalItem, { backgroundColor: surface, borderColor: border }]} 
+                  onPress={() => { setSelectedClient(item); setShowClientPicker(false); setClientSearch(''); }}>
+                  <ThemedText type="defaultSemiBold" style={{fontSize: 16}}>{item.name}</ThemedText>
+                  <ThemedText style={{fontSize: 12, color: '#007AFF'}}>NDIS: {item.ndisNum}</ThemedText>
+                  {item.address && <ThemedText style={{fontSize: 11, color: muted}} numberOfLines={1}>{item.address}</ThemedText>}
+                  {item.notes && <ThemedText style={{fontSize: 10, color: muted, fontStyle: 'italic'}} numberOfLines={1}>{item.notes}</ThemedText>}
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={{padding: 20}}
+            />
+          </SafeAreaView>
+        </Modal>
+
+        {/* Preview Modal Restored */}
+        <Modal visible={showPreview} animationType="slide">
+          <SafeAreaView style={{flex: 1, backgroundColor: surfaceAlt}}>
+            <View style={[styles.modalHeader, { borderBottomColor: border, backgroundColor: surface }]}>
+              <TouchableOpacity onPress={() => setShowPreview(false)} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={24} color="#007AFF" />
+                <ThemedText style={{color: '#007AFF', fontWeight: 'bold'}}>Back</ThemedText>
+              </TouchableOpacity>
+              <ThemedText type="defaultSemiBold">Review Quote</ThemedText>
+              <TouchableOpacity onPress={generatePDF}><Ionicons name="share-outline" size={24} color="#007AFF"/></TouchableOpacity>
+            </View>
+            <ScrollView style={{padding: 20}}>
+              <ThemedView style={{padding: 20, borderRadius: 12, backgroundColor: surface}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 16}}>
+                  {bizInfo?.logoBase64 && (
+                    <Image source={{ uri: `data:image/png;base64,${bizInfo.logoBase64}` }} style={{ height: 48, width: 120, resizeMode: 'contain', marginRight: 12 }} />
+                  )}
+                  <View style={{flex: 1}}>
+                    <ThemedText type="title" style={{color: '#007AFF'}}>{bizInfo?.bizName || 'Service Provider'}</ThemedText>
+                    <ThemedText style={{fontSize: 12, color: muted}}>ABN: {bizInfo?.abn || 'N/A'}</ThemedText>
                   </View>
                 </View>
-                <ThemedText style={{marginTop: 4}}>Provider ID: {bizInfo?.providerNum}</ThemedText>
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.paperSection}>
-                 <ThemedText style={styles.label}>To Participant:</ThemedText>
-                 <ThemedText type="defaultSemiBold" style={{fontSize: 18}}>{selectedClient?.name}</ThemedText>
-                 <ThemedText>NDIS No: {selectedClient?.ndisNum}</ThemedText>
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.paperSection}>
-                 <ThemedText style={[styles.label, {marginBottom: 10}]}>Scope of Works</ThemedText>
-                 {estimate.map((item, index) => (
-                   <View key={index} style={styles.previewItemRow}>
-                     <View style={{flex: 1}}>
-                       <ThemedText>{item.title}</ThemedText>
-                      <ThemedText style={{fontSize: 10, color: muted}}>{item.code}</ThemedText>
-                     </View>
-                     <ThemedText type="defaultSemiBold">${item.price}</ThemedText>
-                   </View>
-                 ))}
-              </View>
-
-              <View style={styles.paperTotal}>
-                 <ThemedText type="subtitle">Grand Total</ThemedText>
-                 <ThemedText type="subtitle" style={{color: '#007AFF'}}>${totalPrice}</ThemedText>
-              </View>
-
-              <View style={styles.complianceNote}>
-                 <Ionicons name="checkmark-seal" size={16} color="#34a853" />
-                 <ThemedText style={styles.footerNote}>
-                   This document is an official NDIS Audit Trail record.
-                 </ThemedText>
-              </View>
+                <View style={{height: 1, backgroundColor: border, marginBottom: 16}} />
+                <ThemedText type="defaultSemiBold">Total Quote: ${totalPrice.toFixed(2)}</ThemedText>
+                <ThemedText style={{marginTop: 10}}>Items: {estimate.length}</ThemedText>
+                <ThemedText style={{color: muted, marginTop: 5}}>For: {selectedClient?.name}</ThemedText>
+              </ThemedView>
             </ScrollView>
-          </View>
-        </ThemedView>
-      </Modal>
-    </ThemedView>
+          </SafeAreaView>
+        </Modal>
+
+      </ThemedView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  header: { marginBottom: 15, marginTop: 10 },
-  bizSub: { fontSize: 12, color: '#007AFF', fontWeight: 'bold', marginTop: 5 },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 8, marginTop: 8, borderWidth: 1 },
-  infoText: { fontSize: 12, color: '#b8860b', flex: 1, lineHeight: 18 },
-  label: { fontSize: 11, color: '#666', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  pickerSection: { marginBottom: 20 },
-  chipScroll: { flexDirection: 'row' },
-  clientChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10, borderWidth: 1 },
-  activeChip: { backgroundColor: '#007AFF', borderColor: '#0056b3' },
-  chipText: { fontSize: 13 },
-  list: { flex: 1 },
-  itemRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderRadius: 12, marginBottom: 10, alignItems: 'center', shadowOpacity: 0.05, elevation: 1, borderWidth: 1 },
-  codeText: { fontSize: 10, color: '#888', marginTop: 4, fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier' },
-  footer: { borderTopWidth: 1, paddingTop: 20 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  btn: { padding: 18, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  btnText: { color: '#fff', fontWeight: 'bold' },
-  previewContainer: { flex: 1, backgroundColor: '#f0f0f0' },
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#fff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#ddd' },
-  previewPaper: { padding: 30, backgroundColor: '#fff', margin: 15, borderRadius: 8, shadowOpacity: 0.1, minHeight: '80%', position: 'relative', overflow: 'hidden' },
-  paperHeader: { marginBottom: 10 },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 15 },
-  paperSection: { marginBottom: 10 },
-  previewItemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0' },
-  paperTotal: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 25, paddingTop: 15, borderTopWidth: 2, borderTopColor: '#eee' },
-  complianceNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 40 },
-  footerNote: { fontSize: 10, color: '#34a853', fontWeight: '600' },
-  
-  // --- NEW BRANDING STYLES ---
-  brandTrademark: { fontSize: 14, fontWeight: '900', color: '#007AFF' },
-  watermarkOverlay: {
-    position: 'absolute',
-    top: '35%',
-    left: '-10%',
-    right: '-10%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.05,
-    transform: [{ rotate: '-30deg' }],
-    zIndex: 0,
-  },
-  watermarkText: { fontSize: 60, fontWeight: '900', color: '#000' },
-  watermarkSub: { fontSize: 14, fontWeight: 'bold', letterSpacing: 4, color: '#000' },
+  container: { flex: 1, padding: 15 },
+  header: { marginBottom: 15 },
+  label: { fontSize: 9, color: '#888', textTransform: 'uppercase', marginBottom: 5, fontWeight: 'bold' },
+  pickerSection: { marginBottom: 15 },
+  selectBtn: { padding: 12, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  selectedCard: { padding: 15, borderRadius: 12, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cartBox: { borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 10 },
+  cartRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemRow: { flexDirection: 'row', padding: 15, borderRadius: 12, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'space-between' },
+  footer: { borderTopWidth: 1, paddingTop: 15 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' },
+  btn: { padding: 16, borderRadius: 12, alignItems: 'center' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  modalItem: { padding: 15, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 }
 });
