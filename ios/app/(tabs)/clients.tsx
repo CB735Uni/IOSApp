@@ -27,6 +27,13 @@ export default function ClientManager() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState({ title: '', message: '' });
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedClientDetail, setSelectedClientDetail] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editNdis, setEditNdis] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? 'light'];
@@ -146,6 +153,25 @@ export default function ClientManager() {
     setShowErrorModal(true);
   };
 
+  const saveClientEdit = async () => {
+    const trimmedName = editName.trim();
+    const trimmedNdis = editNdis.trim();
+    
+    if (!trimmedName || !trimmedNdis) return showError("Missing Info", "Name and NDIS are required.");
+    if (!/^\d{9}$/.test(trimmedNdis)) return showError("Invalid NDIS", "Must be 9 digits.");
+    
+    const updated = clients.map(c => 
+      c.id === selectedClientDetail.id 
+        ? { ...c, name: trimmedName, ndisNum: trimmedNdis, address: editAddress.trim(), notes: editNotes.trim() }
+        : c
+    );
+    
+    await AsyncStorage.setItem('@ndis_clients', JSON.stringify(updated));
+    setClients(updated);
+    setSelectedClientDetail({ ...selectedClientDetail, name: trimmedName, ndisNum: trimmedNdis, address: editAddress.trim(), notes: editNotes.trim() });
+    setIsEditMode(false);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
       <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
@@ -209,7 +235,19 @@ export default function ClientManager() {
               <TouchableOpacity 
                 key={client.id} 
                 onLongPress={() => {setSelectionMode(true); setSelectedIds(new Set([client.id]));}}
-                onPress={() => selectionMode ? toggleSelection(client.id) : null}
+                onPress={() => {
+                  if (selectionMode) {
+                    toggleSelection(client.id);
+                  } else {
+                    setSelectedClientDetail(client);
+                    setEditName(client.name);
+                    setEditNdis(client.ndisNum);
+                    setEditAddress(client.address || '');
+                    setEditNotes(client.notes || '');
+                    setIsEditMode(false);
+                    setShowDetailModal(true);
+                  }
+                }}
                 style={[styles.card, { backgroundColor: surface, borderColor: isSelected ? '#007AFF' : border, borderWidth: isSelected ? 2 : 1 }]}
               >
                 <View style={{ flex: 1 }}>
@@ -273,13 +311,166 @@ export default function ClientManager() {
           </View>
         </Modal>
 
+        {/* Client Detail Modal */}
+        <Modal visible={showDetailModal} animationType="slide" onRequestClose={() => { setShowDetailModal(false); setIsEditMode(false); }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }}>
+            <View style={[styles.modalHeader, { borderBottomColor: border, backgroundColor: surface }]}>
+              <TouchableOpacity onPress={() => { setShowDetailModal(false); setIsEditMode(false); }} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={24} color="#007AFF" />
+                <ThemedText style={{color: '#007AFF', fontWeight: 'bold'}}>Back</ThemedText>
+              </TouchableOpacity>
+              <ThemedText type="defaultSemiBold">{isEditMode ? 'Edit Client' : 'Client Details'}</ThemedText>
+              {!isEditMode && (
+                <TouchableOpacity onPress={() => setIsEditMode(true)}>
+                  <Ionicons name="create-outline" size={24} color="#007AFF" />
+                </TouchableOpacity>
+              )}
+              {isEditMode && <View style={{width: 24}} />}
+            </View>
+            
+            {selectedClientDetail && (
+              <ScrollView style={{ flex: 1, padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={[styles.detailCard, { backgroundColor: surface, borderColor: border }]}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="person" size={24} color="#007AFF" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.detailLabel, { color: muted }]}>Full Name</ThemedText>
+                      {isEditMode ? (
+                        <TextInput
+                          style={[styles.editInput, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]}
+                          value={editName}
+                          onChangeText={setEditName}
+                          placeholder="Full Name"
+                          placeholderTextColor={muted}
+                          maxLength={40}
+                        />
+                      ) : (
+                        <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>{selectedClientDetail.name}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[styles.detailDivider, { backgroundColor: border }]} />
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="card" size={24} color="#007AFF" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.detailLabel, { color: muted }]}>NDIS Number</ThemedText>
+                      {isEditMode ? (
+                        <TextInput
+                          style={[styles.editInput, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]}
+                          value={editNdis}
+                          onChangeText={setEditNdis}
+                          placeholder="NDIS Number"
+                          placeholderTextColor={muted}
+                          keyboardType="numeric"
+                          maxLength={9}
+                        />
+                      ) : (
+                        <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>{selectedClientDetail.ndisNum}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[styles.detailDivider, { backgroundColor: border }]} />
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="location" size={24} color="#007AFF" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.detailLabel, { color: muted }]}>Address</ThemedText>
+                      {isEditMode ? (
+                        <TextInput
+                          style={[styles.editInput, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text }]}
+                          value={editAddress}
+                          onChangeText={setEditAddress}
+                          placeholder="Residential Address"
+                          placeholderTextColor={muted}
+                        />
+                      ) : (
+                        <ThemedText style={{ fontSize: 15, lineHeight: 22 }}>{selectedClientDetail.address || 'Not provided'}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[styles.detailDivider, { backgroundColor: border }]} />
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="document-text" size={24} color="#007AFF" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.detailLabel, { color: muted }]}>Notes</ThemedText>
+                      {isEditMode ? (
+                        <TextInput
+                          style={[styles.editInput, { backgroundColor: surfaceAlt, borderColor: border, color: palette.text, height: 60 }]}
+                          value={editNotes}
+                          onChangeText={setEditNotes}
+                          placeholder="Notes..."
+                          placeholderTextColor={muted}
+                          multiline
+                        />
+                      ) : (
+                        <ThemedText style={{ fontSize: 15, lineHeight: 22 }}>{selectedClientDetail.notes || 'No notes'}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[styles.detailDivider, { backgroundColor: border }]} />
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time" size={24} color="#007AFF" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.detailLabel, { color: muted }]}>Added On</ThemedText>
+                      <ThemedText style={{ fontSize: 15 }}>
+                        {new Date(selectedClientDetail.createdAt).toLocaleDateString('en-AU', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {isEditMode && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+                    <TouchableOpacity 
+                      style={[styles.btn, { flex: 1, backgroundColor: border }]} 
+                      onPress={() => {
+                        setEditName(selectedClientDetail.name);
+                        setEditNdis(selectedClientDetail.ndisNum);
+                        setEditAddress(selectedClientDetail.address || '');
+                        setEditNotes(selectedClientDetail.notes || '');
+                        setIsEditMode(false);
+                      }}
+                    >
+                      <ThemedText>Cancel</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.btn, { flex: 1, backgroundColor: '#34a853' }]} 
+                      onPress={saveClientEdit}
+                    >
+                      <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Save Changes</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Modal>
+
         {/* Menu Modal */}
-        <Modal visible={showMenu} transparent animationType="fade">
-          <TouchableOpacity style={styles.overlay} onPress={() => setShowMenu(false)}>
-            <View style={[styles.menu, { backgroundColor: surface, borderColor: border }]}>
+        <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+          <TouchableOpacity 
+            style={styles.overlay} 
+            activeOpacity={1} 
+            onPress={() => setShowMenu(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1} 
+              style={[styles.menu, { backgroundColor: surface, borderColor: border }]}
+            >
               <TouchableOpacity style={styles.menuItem} onPress={importClients}><Ionicons name="download-outline" size={20} color="#007AFF" /><ThemedText>Import JSON</ThemedText></TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={exportClients}><Ionicons name="share-outline" size={20} color="#34a853" /><ThemedText>Export JSON</ThemedText></TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
       </ThemedView>
@@ -299,7 +490,7 @@ const styles = StyleSheet.create({
   input: { padding: 10, borderWidth: 1, borderRadius: 8, marginBottom: 8, fontSize: 14 },
   addBtn: { backgroundColor: '#34a853', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 4 },
   searchRow: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 10, borderWidth: 1, marginTop: 15 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, paddingVertical: 4, outlineStyle: 'none' },
   sortToggle: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6, padding: 2 },
   sortBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 },
   activeSort: { backgroundColor: '#007AFF' },
@@ -316,5 +507,12 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', gap: 12, padding: 14, alignItems: 'center' },
   alert: { width: '85%', padding: 20, borderRadius: 20 },
   alertTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  btn: { padding: 14, borderRadius: 10, alignItems: 'center' }
+  btn: { padding: 14, borderRadius: 10, alignItems: 'center' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  detailCard: { padding: 20, borderRadius: 16, borderWidth: 1 },
+  detailRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 16 },
+  detailLabel: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 },
+  detailDivider: { height: 1, marginVertical: 4 },
+  editInput: { padding: 10, borderWidth: 1, borderRadius: 8, marginTop: 4, fontSize: 15, outlineStyle: 'none' }
 });

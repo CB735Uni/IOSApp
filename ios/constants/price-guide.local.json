@@ -1,0 +1,28 @@
+{
+  "version": "2026.1",
+  "effectiveFrom": "2026-07-01",
+  "effectiveTo": "2027-06-30",
+  "items": [
+    {
+      "id": "1",
+      "title": "External Grab Rail",
+      "code": "06_181806382_0111_2_2",
+      "price": 185,
+      "unit": "each"
+    },
+    {
+      "id": "2",
+      "title": "Internal Access/Door Widening",
+      "code": "06_182400121_0111_2_2",
+      "price": 1250,
+      "unit": "each"
+    },
+    {
+      "id": "3",
+      "title": "Handheld Shower Install",
+      "code": "06_182400321_0111_2_2",
+      "price": 320,
+      "unit": "each"
+    }
+  ]
+}

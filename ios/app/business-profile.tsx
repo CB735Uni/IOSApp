@@ -95,7 +95,7 @@ export default function BusinessProfileScreen() {
       };
       await AsyncStorage.setItem('@provider_settings', JSON.stringify(settings));
       Alert.alert("Success", "Business profile saved!");
-      router.back();
+      router.canGoBack() ? router.back() : router.push('/(tabs)/settings');
     } catch (e) {
       Alert.alert("Error", "Could not save settings.");
     } finally {
@@ -138,7 +138,7 @@ export default function BusinessProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
       <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.push('/(tabs)/settings')} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
           <ThemedText type="title" style={{ color: palette.text }}>Business Profile</ThemedText>

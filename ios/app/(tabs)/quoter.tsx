@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, View, TextInput, Alert, Modal, FlatList, Image } from 'react-native';
+import { StyleSheet, TouchableOpacity, ScrollView, View, TextInput, Alert, Modal, FlatList, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Print from 'expo-print';
@@ -10,12 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-
-const NDIS_CODES = [
-  { id: '1', title: 'External Grab Rail', code: '06_181806382_0111_2_2', price: 185 },
-  { id: '2', title: 'Internal Access/Door Widening', code: '06_182400121_0111_2_2', price: 1250 },
-  { id: '3', title: 'Handheld Shower Install', code: '06_182400321_0111_2_2', price: 320 },
-];
+import { getCurrentGuide, refreshPriceGuide, PriceGuide, GuideStatus } from '@/services/pricing';
 
 export default function QuoterScreen() {
   const isFocused = useIsFocused();
@@ -39,10 +34,16 @@ export default function QuoterScreen() {
   const [showPreview, setShowPreview] = useState(false);
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
+  const [priceGuide, setPriceGuide] = useState<PriceGuide | null>(null);
+  const [guideStatus, setGuideStatus] = useState<GuideStatus | null>(null);
+  const [guideLoading, setGuideLoading] = useState(false);
 
   const totalPrice = useMemo(() => 
     estimate.reduce((sum, item) => sum + (item.price * item.qty), 0)
   , [estimate]);
+
+  const priceItems = useMemo(() => priceGuide?.items ?? [], [priceGuide]);
+  const guideExpired = useMemo(() => guideStatus?.state === 'expired', [guideStatus]);
 
   const loadData = useCallback(async () => {
     try {
@@ -57,6 +58,28 @@ export default function QuoterScreen() {
     }
   }, []);
 
+  const loadPriceGuide = useCallback(async () => {
+    setGuideLoading(true);
+    const { guide, status } = await getCurrentGuide();
+    setPriceGuide(guide);
+    setGuideStatus(status);
+    setGuideLoading(false);
+  }, []);
+
+  const handleRefreshGuide = useCallback(async () => {
+    setGuideLoading(true);
+    const { guide, status } = await refreshPriceGuide();
+    setPriceGuide(guide);
+    setGuideStatus(status);
+    setGuideLoading(false);
+
+    if (status.state === 'expired') {
+      Alert.alert('Price Guide Expired', status.message || 'The downloaded guide is expired.');
+    } else if (status.state === 'error') {
+      Alert.alert('Pricing Update Failed', status.message || 'Using cached/bundled guide.');
+    }
+  }, []);
+
   const themeColors = useMemo(() => ({
     primary: '#0066cc',
     headerText: theme === 'dark' ? '#e5e7eb' : '#1f2937',
@@ -64,8 +87,11 @@ export default function QuoterScreen() {
   }), [theme]);
 
   useEffect(() => {
-    if (isFocused) loadData();
-  }, [isFocused, loadData]);
+    if (isFocused) {
+      loadData();
+      loadPriceGuide();
+    }
+  }, [isFocused, loadData, loadPriceGuide]);
 
   // Deep search logic
   const filteredClients = useMemo(() => {
@@ -163,6 +189,56 @@ export default function QuoterScreen() {
           </View>
         </View>
 
+        {priceGuide && (
+          <View style={[styles.priceMeta, { backgroundColor: surface, borderColor: border }]}>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">NDIS Price Guide {priceGuide.version}</ThemedText>
+              <ThemedText style={{ color: muted, fontSize: 12 }}>
+                Effective from {priceGuide.effectiveFrom}
+                {priceGuide.effectiveTo ? ` · Valid until ${priceGuide.effectiveTo}` : ''}
+              </ThemedText>
+              {guideStatus?.state === 'using-bundled' && guideStatus.message && (
+                <ThemedText style={{ color: muted, fontSize: 11, marginTop: 4 }}>
+                  {guideStatus.message}
+                </ThemedText>
+              )}
+            </View>
+            <TouchableOpacity 
+              style={[styles.refreshBtn, { opacity: guideLoading ? 0.7 : 1 }]}
+              onPress={handleRefreshGuide}
+              disabled={guideLoading}
+            >
+              {guideLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Refresh</ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {guideStatus && guideStatus.state !== 'ok' && guideStatus.state !== 'updated-local' && (
+          <View 
+            style={[
+              styles.statusBanner,
+              {
+                backgroundColor: guideExpired ? '#fff3f0' : '#fff9e6',
+                borderColor: guideExpired ? '#ffb3a1' : '#ffe2a8',
+              },
+            ]}
+          >
+            <Ionicons 
+              name={guideExpired ? 'alert-circle' : 'information-circle'} 
+              size={20} 
+              color={guideExpired ? '#d9534f' : '#d98c00'} 
+              style={{ marginRight: 8 }}
+            />
+            <ThemedText style={{ flex: 1, color: guideExpired ? '#a94442' : '#8a6d3b' }}>
+              {guideStatus.message || (guideExpired ? 'Price guide is expired. Please refresh before quoting.' : 'Using cached/bundled price guide.')}
+            </ThemedText>
+          </View>
+        )}
+
         {/* Participant Selector - Full Details Restored */}
         <View style={styles.pickerSection}>
           <ThemedText style={styles.label}>Participant</ThemedText>
@@ -227,15 +303,25 @@ export default function QuoterScreen() {
         {/* Restore Catalog Section */}
         <ThemedText style={styles.label}>Catalog</ThemedText>
         <ScrollView style={{flex: 1}}>
-          {NDIS_CODES.map(item => (
-            <TouchableOpacity key={item.id} style={[styles.itemRow, { backgroundColor: surface, borderColor: border }]} onPress={() => addItem(item)}>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="defaultSemiBold" style={{fontSize: 14, color: palette.text}}>{item.title}</ThemedText>
-                <ThemedText style={{fontSize: 10, color: muted}}>{item.code}</ThemedText>
-              </View>
-              <ThemedText type="defaultSemiBold" style={{color: palette.text}}>${item.price}</ThemedText>
-            </TouchableOpacity>
-          ))}
+          {priceItems.length === 0 ? (
+            <View style={[styles.emptyGuide, { backgroundColor: surface, borderColor: border }]}>
+              <Ionicons name="cloud-offline" size={24} color={muted} style={{ marginBottom: 8 }} />
+              <ThemedText style={{ fontSize: 14, color: palette.text, textAlign: 'center' }}>No price guide loaded</ThemedText>
+              <ThemedText style={{ fontSize: 12, color: muted, textAlign: 'center', marginTop: 4 }}>
+                Tap Refresh to load the latest NDIS Price Guide.
+              </ThemedText>
+            </View>
+          ) : (
+            priceItems.map(item => (
+              <TouchableOpacity key={item.id} style={[styles.itemRow, { backgroundColor: surface, borderColor: border }]} onPress={() => addItem(item)}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="defaultSemiBold" style={{fontSize: 14, color: palette.text}}>{item.title}</ThemedText>
+                  <ThemedText style={{fontSize: 10, color: muted}}>{item.code}</ThemedText>
+                </View>
+                <ThemedText type="defaultSemiBold" style={{color: palette.text}}>${item.price}</ThemedText>
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
 
         <View style={[styles.footer, { borderTopColor: border }]}>
@@ -296,6 +382,17 @@ export default function QuoterScreen() {
                 </TouchableOpacity>
               )}
               contentContainerStyle={{padding: 20}}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 60 }}>
+                  <Ionicons name="people-outline" size={64} color={muted} style={{ marginBottom: 16 }} />
+                  <ThemedText type="defaultSemiBold" style={{ fontSize: 18, marginBottom: 8, textAlign: 'center' }}>
+                    No Clients Found
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 14, color: muted, textAlign: 'center', paddingHorizontal: 40 }}>
+                    {clientSearch ? 'No clients match your search.' : 'You have no clients yet. Go to the Clients tab to add your first client.'}
+                  </ThemedText>
+                </View>
+              }
             />
           </SafeAreaView>
         </Modal>

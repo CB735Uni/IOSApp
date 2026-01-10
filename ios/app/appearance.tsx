@@ -53,7 +53,7 @@ export default function AppearanceScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
       <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.push('/(tabs)/settings')} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
           <ThemedText type="title" style={{ color: palette.text }}>Appearance</ThemedText>

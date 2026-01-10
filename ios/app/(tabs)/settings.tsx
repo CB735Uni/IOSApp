@@ -1,13 +1,28 @@
-import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View, Alert, ScrollView, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, TouchableOpacity, View, Alert, ScrollView, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+
+const VAULT_PIN_KEY = 'vaultPin';
+const BIOMETRIC_ENABLED_KEY = 'vaultBiometricEnabled';
+
+// Platform-aware storage helpers
+const getSecureItem = async (key: string) => {
+  if (Platform.OS === 'web') {
+    return await AsyncStorage.getItem(key);
+  } else {
+    return await SecureStore.getItemAsync(key);
+  }
+};
 
 interface MenuOption {
   id: string;
@@ -21,6 +36,9 @@ interface MenuOption {
 
 export default function MoreScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [pinSet, setPinSet] = useState(false);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const palette = Colors[colorScheme ?? 'light'];
@@ -28,6 +46,30 @@ export default function MoreScreen() {
   const surfaceAlt = colorScheme === 'dark' ? '#13171b' : '#f9f9f9';
   const border = colorScheme === 'dark' ? '#2d3238' : '#ddd';
   const textMuted = colorScheme === 'dark' ? '#aeb3b9' : '#666';
+
+  useEffect(() => {
+    initializeVaultStatus();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      initializeVaultStatus();
+    }, [])
+  );
+
+  const initializeVaultStatus = async () => {
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      setBiometricAvailable(compatible);
+      const savedPin = await getSecureItem(VAULT_PIN_KEY);
+      setPinSet(!!savedPin);
+      const bioEnabled = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
+      setBiometricEnabled(bioEnabled === 'true' && compatible);
+      console.log('Vault status updated:', { pinSet: !!savedPin, bioEnabled: bioEnabled === 'true' });
+    } catch (err) {
+      console.warn('Vault status init error:', err);
+    }
+  };
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -52,6 +94,51 @@ export default function MoreScreen() {
 
   const cancelLogout = () => {
     setShowLogoutModal(false);
+  };
+
+  const handleVaultSettings = () => {
+    console.log('handleVaultSettings called - pinSet:', pinSet, 'biometricEnabled:', biometricEnabled);
+    const message = `PIN: ${pinSet ? 'Set' : 'Not Set'}\nBiometric: ${biometricEnabled ? 'Enabled' : 'Disabled'}`;
+    console.log('Showing alert with message:', message);
+    Alert.alert(
+      'Vault Security',
+      message,
+      [
+        { text: 'Toggle Biometric', onPress: () => toggleBiometricFromSettings() },
+        { text: 'Close', style: 'cancel' }
+      ]
+    );
+  };
+
+  const toggleBiometricFromSettings = async () => {
+    if (!biometricAvailable) {
+      Alert.alert('Not available', 'Biometric authentication not available on this device');
+      return;
+    }
+    if (!pinSet) {
+      Alert.alert('PIN Required', 'Please set a PIN in the Vault first');
+      return;
+    }
+    const newState = !biometricEnabled;
+    try {
+      if (newState) {
+        const result = await LocalAuthentication.authenticateAsync({
+          reason: 'Enable biometric unlock for Vault',
+          disableDeviceFallback: false,
+        });
+        if (result.success) {
+          await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+          setBiometricEnabled(true);
+          Alert.alert('Success', 'Biometric unlock enabled for Vault');
+        }
+      } else {
+        await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'false');
+        setBiometricEnabled(false);
+        Alert.alert('Success', 'Biometric unlock disabled for Vault');
+      }
+    } catch (err) {
+      console.warn('Biometric toggle error:', err);
+    }
   };
 
   // Menu options configuration
@@ -104,6 +191,14 @@ export default function MoreScreen() {
           onPress: () => router.push('/offline-mode'),
           showChevron: true,
         },
+        {
+          id: 'vault',
+          icon: 'shield-checkmark-outline',
+          label: 'Vault Security',
+          subtitle: `PIN: ${pinSet ? 'Set' : 'Not Set'} • Biometric: ${biometricEnabled ? 'On' : 'Off'}`,
+          onPress: () => router.push('/vault-settings'),
+          showChevron: true,
+        },
       ],
     },
     {
@@ -147,25 +242,6 @@ export default function MoreScreen() {
       ],
     },
     {
-      title: 'Legal',
-      options: [
-        {
-          id: 'privacy',
-          icon: 'lock-closed-outline',
-          label: 'Privacy Policy',
-          onPress: () => Alert.alert('Privacy Policy', 'Visit modiproof.com.au/privacy for our privacy policy.'),
-          showChevron: true,
-        },
-        {
-          id: 'terms',
-          icon: 'document-text-outline',
-          label: 'Terms of Service',
-          onPress: () => Alert.alert('Terms of Service', 'Visit modiproof.com.au/terms for our terms of service.'),
-          showChevron: true,
-        },
-      ],
-    },
-    {
       title: 'Account Actions',
       options: [
         {
@@ -173,7 +249,7 @@ export default function MoreScreen() {
           icon: 'log-out-outline',
           label: 'Sign Out',
           subtitle: 'Sign out of ModiProof',
-          onPress: handleLogout,
+          onPress: () => handleLogout(),
           showChevron: false,
           color: '#ff4444',
         },
@@ -209,7 +285,10 @@ export default function MoreScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: surfaceAlt }} edges={['top']}>
       <ThemedView style={[styles.container, { backgroundColor: surfaceAlt }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+        >
           <ThemedText type="title" style={[styles.header, { color: palette.text }]}>
             More
           </ThemedText>
@@ -264,7 +343,6 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
   },
   header: {
     marginTop: 20,
